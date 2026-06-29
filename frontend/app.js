@@ -10,6 +10,7 @@ const icons = {
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
   waveform: '<path d="M4 10v4"/><path d="M8 7v10"/><path d="M12 4v16"/><path d="M16 7v10"/><path d="M20 10v4"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   camera: '<path d="M14.5 4 16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.5-3z"/><circle cx="12" cy="13" r="3"/>',
   image: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 19"/>',
   send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
@@ -188,11 +189,10 @@ function renderCheckin() {
   return `<section class="page chat-page with-input">
     <header class="chat-top">
       <button class="round-tool" data-route="home" aria-label="返回首页">${icon("menu")}</button>
-      <button class="model-title" type="button">AI 教练 <span>⌄</span></button>
-      <button class="round-tool accent" data-action="open-album" aria-label="添加学习成果">${icon("plus")}</button>
+      <button class="model-title" type="button">学习记录</button>
+      <button class="round-tool accent" data-action="open-album" aria-label="添加学习成果">${icon("pencil")}</button>
     </header>
     <div class="chat-list">
-      ${botBubble("请上传你今天的学习成果，我会认真看看，并给你一张温柔的评分卡。笔记、作业、练习题或读书记录都可以。")}
       ${hasUpload ? userUploadBubble() : ""}
       ${state.checkin.status === "analyzing" ? botAnalyzing() : ""}
       ${analyzed ? botScoreCard() : ""}
@@ -267,7 +267,7 @@ function inputBar() {
     <input class="file-input" id="cameraInput" type="file" accept="image/*" capture="environment" />
     <input class="file-input" id="albumInput" type="file" accept="image/*" />
     <button class="composer-plus" data-action="open-album" aria-label="添加学习成果">${icon("plus")}</button>
-    <input type="text" id="chatText" placeholder="Reply to AI 教练" aria-label="输入学习说明" />
+    <input type="text" id="chatText" placeholder="记录今天的学习" aria-label="输入学习说明" />
     <button class="composer-mic" data-action="open-camera" aria-label="拍照上传">${icon("mic")}</button>
     <button class="composer-send" data-action="send-checkin" aria-label="发送">${icon("waveform")}</button>
   </div>`;
