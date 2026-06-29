@@ -3,8 +3,11 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from backend.app.core.config import get_settings
 
-UPLOAD_DIR = Path("backend/uploads")
+
+settings = get_settings()
+UPLOAD_DIR = Path(settings.upload_dir)
 
 app = FastAPI(
     title="Reward API",

@@ -41,6 +41,20 @@ py -m venv .venv
 - API 健康检查: `http://127.0.0.1:8000/api/health`
 - Swagger 文档: `http://127.0.0.1:8000/docs`
 
+## 数据库迁移
+
+生成迁移文件：
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini revision --autogenerate -m "initial schema"
+```
+
+执行迁移：
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
+```
+
 ## 打开前端页面
 
 直接用浏览器打开：
@@ -59,3 +73,7 @@ Start-Process .\frontend\index.html
 - 接入上传、AI 识别或 OpenAI API 能力
 - 将前端原型改造成可维护的工程化前端应用
 - 增加测试、格式化、配置管理和部署脚本
+
+## 后端设计文档
+
+- 数据模型与业务规则设计: `backend/DATA_MODEL.md`

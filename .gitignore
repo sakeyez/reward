@@ -2,6 +2,7 @@
 __pycache__/
 .env
 *.pyc
+*.db
 node_modules/
 dist/
 uploads/
