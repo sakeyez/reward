@@ -1,0 +1,171 @@
+:root {
+  --ink: #16161d;
+  --muted: #74717d;
+  --line: rgba(22, 22, 29, 0.08);
+  --violet: #7767f4;
+  --pink: #ff8fb8;
+  --mint: #74dac5;
+  --sun: #f7c566;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #efede8;
+  color: var(--ink);
+  font-family: "PingFang SC", "HarmonyOS Sans", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 390px);
+  gap: 30px;
+  padding: 34px;
+}
+
+.board-head { grid-column: 1 / -1; }
+.board-head p, span, p { margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+.board-head h1 { margin: 6px 0 0; font-size: 32px; }
+
+.phone {
+  width: 390px;
+  height: 844px;
+  padding: 12px;
+  border-radius: 42px;
+  background: #101014;
+  box-shadow: 0 30px 80px rgba(39, 36, 55, 0.24);
+}
+
+.screen {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  padding: 26px 18px 96px;
+  border-radius: 32px;
+  background: linear-gradient(180deg, #fffaf4 0%, #f8f4ff 58%, #f2fff9 100%);
+}
+
+h2, h3 { margin: 0; }
+h2 { margin-top: 4px; font-size: 30px; line-height: 1.08; }
+h3 { font-size: 20px; }
+
+.top, .focus-card, .mini-grid, .chat-top, .loading, .score-card > div, .actions, .day-detail,
+.profile-head, nav, .composer, .tabs {
+  display: flex;
+  align-items: center;
+}
+
+.top, .focus-card, .chat-top, .score-card > div, .profile-head { justify-content: space-between; }
+
+.top i, .profile-head i {
+  width: 52px; height: 52px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--pink), var(--sun));
+}
+
+.focus-card, .soft-card, .mini-grid article, .score-card, .day-detail, .wallet, .products article,
+.level, .badges article, .settings, .calendar, nav, .composer, .loading {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 16px 40px rgba(54, 48, 78, 0.1);
+}
+
+.focus-card { min-height: 194px; margin-top: 22px; padding: 20px; border-radius: 32px; }
+.focus-card h3 { margin: 10px 0 8px; max-width: 170px; font-size: 22px; }
+
+.ring, .big-score {
+  width: 102px; height: 102px; display: grid; place-items: center; border-radius: 50%;
+  background: linear-gradient(135deg, #ff9cbd, #f7c566);
+  text-align: center;
+}
+.ring strong, .big-score strong { display: block; font-size: 32px; }
+
+button {
+  border: 0; border-radius: 999px; color: white; font-size: 16px; font-weight: 900;
+  background: linear-gradient(135deg, var(--pink), var(--violet), var(--mint));
+}
+.home > button, .shop button { width: 100%; height: 54px; margin-top: 14px; }
+
+.mini-grid { gap: 10px; margin-top: 16px; }
+.mini-grid article { flex: 1; min-height: 86px; padding: 13px; border-radius: 24px; }
+.mini-grid strong { display: block; margin-top: 8px; font-size: 24px; }
+
+.soft-card { margin-top: 16px; padding: 18px; border-radius: 28px; }
+.soft-card p { margin-top: 8px; }
+
+nav {
+  position: absolute; right: 14px; bottom: 14px; left: 14px; height: 72px;
+  justify-content: space-around; border-radius: 28px; backdrop-filter: blur(24px);
+}
+nav span { width: 30px; height: 30px; border-radius: 14px; background: #e7e3ec; }
+nav span.on { background: var(--violet); }
+
+.chat { background: #f7f7fb; }
+.chat-top { gap: 12px; }
+.chat-top i, .chat-top em {
+  width: 42px; height: 42px; border-radius: 50%; background: #fff;
+  box-shadow: 0 10px 26px rgba(36, 32, 52, 0.08);
+}
+.chat-top em { background: linear-gradient(135deg, var(--mint), #fff); }
+.chat-top div { flex: 1; }
+.chat-top h2 { font-size: 24px; }
+
+.bubble { margin-top: 20px; max-width: 82%; padding: 14px; border-radius: 24px 24px 24px 8px; background: #fff; box-shadow: 0 12px 28px rgba(36,32,52,.08); font-weight: 700; }
+.bubble.user { margin-left: auto; border-radius: 24px 24px 8px 24px; background: #eae6ff; }
+.paper { height: 132px; border-radius: 20px; background: linear-gradient(#fff 0 0) 22px 28px/120px 8px no-repeat, linear-gradient(#d7d0ff 0 0) 22px 56px/158px 8px no-repeat, linear-gradient(#bcecdf 0 0) 22px 84px/136px 8px no-repeat, #fffdf8; }
+.paper.small { width: 82px; height: 72px; }
+
+.loading { gap: 12px; width: max-content; margin-top: 12px; padding: 12px 14px; border-radius: 999px; }
+.loading span { width: 28px; height: 28px; border-radius: 50%; background: conic-gradient(var(--violet), var(--mint), var(--pink), var(--violet)); }
+.score-card { margin-top: 14px; padding: 16px; border-radius: 30px; background: #fff; }
+.score-card strong { font-size: 42px; }
+.score-card small { color: var(--violet); font-weight: 900; }
+.score-card p { margin-top: 10px; }
+
+.composer { position: absolute; right: 14px; bottom: 14px; left: 14px; height: 72px; gap: 12px; padding: 0 14px; border-radius: 28px; background: #fff; }
+.composer span { flex: 1; height: 42px; border-radius: 999px; background: #f2f2f6; }
+.composer b { width: 42px; height: 42px; border-radius: 50%; background: var(--violet); }
+.composer b:last-child { background: var(--mint); }
+
+.result { text-align: center; background: linear-gradient(180deg, #fff9ed, #f8f4ff); }
+.celebration { height: 52px; background: radial-gradient(circle at 20% 30%, var(--pink) 0 5px, transparent 6px), radial-gradient(circle at 75% 20%, var(--mint) 0 5px, transparent 6px), radial-gradient(circle at 50% 80%, var(--sun) 0 5px, transparent 6px); }
+.big-score { width: 150px; height: 150px; margin: 20px auto; }
+.big-score strong { font-size: 48px; }
+.actions { gap: 10px; margin-top: 18px; }
+.actions button { flex: 1; height: 50px; }
+.score-bars { margin-top: 16px; display: grid; gap: 12px; }
+.score-bars div { height: 34px; text-align: left; }
+.score-bars b { display: block; height: 10px; margin-top: 5px; border-radius: 999px; background: linear-gradient(90deg, var(--pink), var(--violet), var(--mint)); }
+
+mark { min-width: 64px; height: 38px; display: grid; place-items: center; border: 0; border-radius: 999px; background: linear-gradient(135deg, #74bff8, #b5a5ff); color: white; font-weight: 900; }
+.calendar-page, .shop, .profile { background: linear-gradient(180deg, #f5fbff, #fffaf5 52%, #faf3ff); }
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 16px; padding: 14px; border-radius: 30px; background: #fff; }
+.calendar span { min-height: 48px; display: grid; place-items: center; border-radius: 16px; background: #f1f3f7; font-size: 12px; font-weight: 900; }
+.calendar span.hot { background: #d9d2ff; color: #4636be; }
+.calendar span.sel { background: var(--violet); color: white; }
+.day-detail { gap: 12px; margin-top: 16px; padding: 12px; border-radius: 28px; }
+
+.wallet { margin-top: 18px; padding: 18px; border-radius: 30px; color: white; background: linear-gradient(135deg, var(--pink), var(--violet)); }
+.wallet span, .wallet p { color: rgba(255,255,255,.78); }
+.wallet strong { display: block; font-size: 38px; }
+.tabs { gap: 8px; margin-top: 14px; overflow: hidden; }
+.tabs span { padding: 10px 14px; border-radius: 999px; background: #fff; }
+.tabs span:first-child { color: white; background: var(--ink); }
+.products { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+.products article { min-height: 156px; padding: 12px; border-radius: 26px; background: #fff; }
+.products i, .badges i { display: block; height: 66px; margin-bottom: 10px; border-radius: 22px; background: linear-gradient(135deg, #ffd7a1, #b5a5ff); }
+.products small { display: inline-block; margin-top: 8px; color: #247868; font-weight: 900; }
+
+.profile-head { gap: 12px; }
+.profile-head div { flex: 1; }
+.level { margin-top: 18px; padding: 16px; border-radius: 28px; }
+.level div { height: 12px; margin-top: 12px; border-radius: 999px; background: #eceaf2; overflow: hidden; }
+.level span { display: block; width: 68%; height: 100%; background: linear-gradient(90deg, var(--pink), var(--violet), var(--mint)); }
+.profile h3 { margin-top: 22px; }
+.badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.badges article { min-height: 126px; padding: 12px; border-radius: 24px; background: #fff; }
+.badges i { width: 44px; height: 44px; }
+.settings { margin-top: 18px; overflow: hidden; border-radius: 26px; background: #fff; }
+.settings div { padding: 16px; border-bottom: 1px solid var(--line); font-weight: 800; }
+.settings div:last-child { border-bottom: 0; }

@@ -1,0 +1,22 @@
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+
+
+UPLOAD_DIR = Path("backend/uploads")
+
+app = FastAPI(
+    title="Reward API",
+    description="Backend API for the AI learning check-in and points reward system.",
+    version="0.1.0",
+)
+
+
+@app.get("/api/health")
+async def health_check() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+if UPLOAD_DIR.exists():
+    app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
