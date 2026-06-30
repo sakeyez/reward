@@ -14,6 +14,7 @@ import {
   Users
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import dogecoinIcon from "./assets/dogecoin.png";
 import { api, ApiError } from "./lib/api";
 import type {
   AdminCheckin,
@@ -217,7 +218,7 @@ function AdminApp() {
           <AdminNavItem tab="overview" active={tab} setTab={setTab} icon={<LayoutDashboard />} label="概览" />
           <AdminNavItem tab="users" active={tab} setTab={setTab} icon={<Users />} label="用户管理" />
           <AdminNavItem tab="checkins" active={tab} setTab={setTab} icon={<BarChart3 />} label="打卡记录" />
-          <AdminNavItem tab="transactions" active={tab} setTab={setTab} icon={<Coins />} label="积分流水" />
+          <AdminNavItem tab="transactions" active={tab} setTab={setTab} icon={<Coins />} label="狗狗币流水" />
           <AdminNavItem tab="rewards" active={tab} setTab={setTab} icon={<Gift />} label="奖励管理" />
           <AdminNavItem tab="redemptions" active={tab} setTab={setTab} icon={<PackageCheck />} label="兑换处理" />
         </nav>
@@ -299,7 +300,7 @@ function AdminLogin({
     <section className="admin-login">
       <div className="admin-login-copy">
         <p>Reward Admin</p>
-        <h1>管理学习积分、奖励和兑换处理。</h1>
+        <h1>管理学习狗狗币、奖励和兑换处理。</h1>
       </div>
       <form className="admin-login-card" onSubmit={submit}>
         <label>账号<input name="identifier" defaultValue="admin" required /></label>
@@ -333,26 +334,26 @@ function AdminNavItem({
 
 function Overview({ summary, redemptions }: { summary: AdminSummary | null; redemptions: AdminRedemption[] }) {
   const cards = [
-    ["用户总数", summary?.users_total ?? 0],
-    ["活跃用户", summary?.active_users ?? 0],
-    ["今日打卡", summary?.today_checkins ?? 0],
-    ["发放积分", summary?.points_earned ?? 0],
-    ["消耗积分", summary?.points_spent ?? 0],
-    ["待处理兑换", summary?.pending_redemptions ?? 0]
+    { label: "用户总数", value: summary?.users_total ?? 0 },
+    { label: "活跃用户", value: summary?.active_users ?? 0 },
+    { label: "今日打卡", value: summary?.today_checkins ?? 0 },
+    { label: "发放狗狗币", value: <AdminDogecoinAmount value={summary?.points_earned ?? 0} /> },
+    { label: "消耗狗狗币", value: <AdminDogecoinAmount value={summary?.points_spent ?? 0} /> },
+    { label: "待处理兑换", value: summary?.pending_redemptions ?? 0 }
   ];
   return (
     <section className="admin-content">
       <div className="admin-metrics">
-        {cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}
+        {cards.map((card) => <article key={card.label}><span>{card.label}</span><strong>{card.value}</strong></article>)}
       </div>
       <section className="admin-panel">
         <div className="admin-panel-title"><h2>待处理兑换</h2><ReceiptText /></div>
         <AdminTable
-          headers={["用户", "奖励", "积分", "状态", "时间"]}
+          headers={["用户", "奖励", "狗狗币", "状态", "时间"]}
           rows={redemptions.filter((item) => item.status === "created").slice(0, 8).map((item) => [
             item.user_display_name,
             item.reward_name,
-            item.cost_points,
+            <AdminDogecoinAmount value={item.cost_points} />,
             statusTag(item.status),
             formatDate(item.created_at)
           ])}
@@ -381,12 +382,12 @@ function UsersPanel({
         <label className="admin-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索用户" /></label>
       </div>
       <AdminTable
-        headers={["ID", "昵称", "账号", "积分", "连续", "角色", "状态", "操作"]}
+        headers={["ID", "昵称", "账号", "狗狗币", "连续", "角色", "状态", "操作"]}
         rows={users.map((item) => [
           item.id,
           item.display_name,
           item.username ?? "-",
-          item.current_points,
+          <AdminDogecoinAmount value={item.current_points} />,
           item.streak_days,
           item.roles.join(", "),
           statusTag(item.status),
@@ -404,13 +405,13 @@ function CheckinsPanel({ checkins }: { checkins: AdminCheckin[] }) {
   return (
     <section className="admin-panel">
       <AdminTable
-        headers={["用户", "日期", "内容", "分数", "积分", "状态", "AI 评价"]}
+        headers={["用户", "日期", "内容", "分数", "狗狗币", "状态", "AI 评价"]}
         rows={checkins.map((item) => [
           item.user_display_name,
           item.checkin_date,
           truncate(item.content_text ?? "-"),
           item.total_score ?? "-",
-          item.awarded_points,
+          <AdminDogecoinAmount value={item.awarded_points} />,
           statusTag(item.status),
           truncate(item.ai_comment ?? "-")
         ])}
@@ -427,8 +428,8 @@ function TransactionsPanel({ transactions }: { transactions: AdminPointTransacti
         rows={transactions.map((item) => [
           item.user_display_name,
           statusTag(item.type),
-          item.amount > 0 ? `+${item.amount}` : item.amount,
-          item.balance_after,
+          <AdminDogecoinAmount value={item.amount > 0 ? `+${item.amount}` : item.amount} />,
+          <AdminDogecoinAmount value={item.balance_after} />,
           item.reason,
           formatDate(item.created_at)
         ])}
@@ -450,11 +451,11 @@ function RewardsPanel({
     <section className="admin-panel">
       <div className="admin-toolbar"><button className="admin-primary compact" onClick={onCreate}><Plus />新增奖励</button></div>
       <AdminTable
-        headers={["名称", "分类", "积分", "库存", "状态", "说明", "操作"]}
+        headers={["名称", "分类", "狗狗币", "库存", "状态", "说明", "操作"]}
         rows={rewards.map((item) => [
           item.name,
           item.category,
-          item.cost_points,
+          <AdminDogecoinAmount value={item.cost_points} />,
           item.stock ?? "不限",
           statusTag(item.status),
           truncate(item.description ?? "-"),
@@ -488,11 +489,11 @@ function RedemptionsPanel({
         </select>
       </div>
       <AdminTable
-        headers={["用户", "奖励", "积分", "收件信息", "状态", "时间", "操作"]}
+        headers={["用户", "奖励", "狗狗币", "收件信息", "状态", "时间", "操作"]}
         rows={visible.map((item) => [
           item.user_display_name,
           item.reward_name,
-          item.cost_points,
+          <AdminDogecoinAmount value={item.cost_points} />,
           [item.receiver_name, item.receiver_phone, item.receiver_address].filter(Boolean).join(" / ") || "-",
           statusTag(item.status),
           formatDate(item.created_at),
@@ -523,10 +524,10 @@ function PointModal({
     onSubmit(Number(form.get("amount")), String(form.get("reason") ?? ""));
   }
   return (
-    <Modal title={`调整积分：${user.display_name}`} onClose={onClose}>
+    <Modal title={`调整狗狗币：${user.display_name}`} onClose={onClose}>
       <form className="admin-form" onSubmit={submit}>
-        <label>变动积分<input name="amount" type="number" placeholder="例如 100 或 -50" required /></label>
-        <label>原因<input name="reason" maxLength={255} placeholder="运营补发积分" required /></label>
+        <label>变动狗狗币<input name="amount" type="number" placeholder="例如 100 或 -50" required /></label>
+        <label>原因<input name="reason" maxLength={255} placeholder="运营补发狗狗币" required /></label>
         <button className="admin-primary">保存调整</button>
       </form>
     </Modal>
@@ -563,7 +564,7 @@ function RewardModal({
         <label>分类<input name="category" defaultValue={reward?.category ?? "文具"} required /></label>
         <label>说明<input name="description" defaultValue={reward?.description ?? ""} /></label>
         <label>图片 URL<input name="image_url" defaultValue={reward?.image_url ?? ""} /></label>
-        <label>积分<input name="cost_points" type="number" min={0} defaultValue={reward?.cost_points ?? 100} required /></label>
+        <label>狗狗币<input name="cost_points" type="number" min={0} defaultValue={reward?.cost_points ?? 100} required /></label>
         <label>库存<input name="stock" type="number" min={0} defaultValue={reward?.stock ?? ""} placeholder="留空表示不限" /></label>
         <label>状态<select name="status" defaultValue={reward?.status ?? "active"}><option value="active">active</option><option value="inactive">inactive</option></select></label>
         <button className="admin-primary">保存奖励</button>
@@ -580,6 +581,15 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
         {children}
       </section>
     </div>
+  );
+}
+
+function AdminDogecoinAmount({ value }: { value: string | number }) {
+  return (
+    <span className="admin-dogecoin-amount">
+      <img src={dogecoinIcon} alt="" />
+      <span>{value}</span>
+    </span>
   );
 }
 
@@ -607,7 +617,7 @@ function titleForTab(tab: AdminTab): string {
     overview: "运营概览",
     users: "用户管理",
     checkins: "打卡记录",
-    transactions: "积分流水",
+    transactions: "狗狗币流水",
     rewards: "奖励管理",
     redemptions: "兑换处理"
   };
