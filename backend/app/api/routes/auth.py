@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.security import create_access_token
@@ -39,6 +40,22 @@ async def login(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenResponse:
     user = await authenticate_user(session, login_in.identifier, login_in.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return TokenResponse(access_token=create_access_token(str(user.id)), user=user)
+
+
+@router.post("/token", response_model=TokenResponse, include_in_schema=False)
+async def token_login(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> TokenResponse:
+    user = await authenticate_user(session, form_data.username, form_data.password)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
