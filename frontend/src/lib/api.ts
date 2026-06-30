@@ -99,6 +99,12 @@ export const api = {
   me(token: string) {
     return request<User>("/api/users/me", {}, token);
   },
+  updateMe(token: string, formData: FormData) {
+    return request<User>("/api/users/me", {
+      method: "PATCH",
+      body: formData
+    }, token);
+  },
   createCheckin(token: string, formData: FormData) {
     return request<Checkin>("/api/checkins", {
       method: "POST",

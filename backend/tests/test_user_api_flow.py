@@ -113,3 +113,27 @@ def test_user_checkin_points_and_redemption_flow(client: TestClient) -> None:
     redemptions = client.get("/api/redemptions/me", headers=auth_headers(token))
     assert redemptions.status_code == 200
     assert len(redemptions.json()) == 1
+
+
+def test_user_can_update_profile(client: TestClient) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "profile_user",
+            "password": "password123",
+            "display_name": "Before",
+        },
+    )
+    assert register.status_code == 201
+    token = register.json()["access_token"]
+
+    update = client.patch(
+        "/api/users/me",
+        data={"display_name": "After"},
+        files={"avatar": ("avatar.png", b"fake-image-bytes", "image/png")},
+        headers=auth_headers(token),
+    )
+    assert update.status_code == 200
+    body = update.json()
+    assert body["display_name"] == "After"
+    assert body["avatar_url"].startswith("/uploads/avatars/")

@@ -3,6 +3,7 @@ import {
   BookOpen,
   Calendar,
   Camera,
+  ChevronLeft,
   Check,
   ChevronRight,
   Flame,
@@ -35,6 +36,7 @@ import type {
 } from "./lib/types";
 
 const TOKEN_KEY = "reward_access_token";
+const THEME_KEY = "reward_theme";
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -63,6 +65,10 @@ function App() {
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [loading, setLoading] = useState(Boolean(token));
   const [message, setMessage] = useState("");
+  const [theme, setTheme] = useState<"paper" | "focus">(() => {
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    return savedTheme === "focus" ? "focus" : "paper";
+  });
 
   const signedIn = Boolean(token && user);
 
@@ -155,6 +161,10 @@ function App() {
     refreshDashboard(token).catch((error) => setMessage(readableError(error)));
   }, [refreshDashboard, refreshShop, route, signedIn, token]);
 
+  useEffect(() => {
+    localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
   async function handleAuth(mode: "login" | "register", form: FormData) {
     try {
       setMessage("");
@@ -210,6 +220,18 @@ function App() {
     }
   }
 
+  async function handleUpdateProfile(form: FormData) {
+    if (!token) return;
+    try {
+      setMessage("");
+      const nextUser = await api.updateMe(token, form);
+      setUser(nextUser);
+    } catch (error) {
+      setMessage(readableError(error));
+      throw error;
+    }
+  }
+
   if (loading) {
     return <Shell><div className="empty-copy">正在连接学习记录...</div></Shell>;
   }
@@ -225,7 +247,7 @@ function App() {
   const calendarRecords = Object.fromEntries((calendar?.days ?? []).map((item) => [item.day, item]));
 
   return (
-    <Shell>
+    <Shell theme={theme}>
       {message && <div className="toast" role="status">{message}</div>}
       {route === "home" && (
         <HomePage
@@ -276,6 +298,18 @@ function App() {
           redemptions={redemptions}
           onSignOut={signOut}
           onRefresh={refreshUser}
+          onUpdateProfile={handleUpdateProfile}
+          theme={theme}
+          setTheme={setTheme}
+          setRoute={setRoute}
+        />
+      )}
+      {route === "badges" && (
+        <BadgeDetailPage
+          user={user}
+          checkins={checkins}
+          redemptions={redemptions}
+          setRoute={setRoute}
         />
       )}
       {selectedReward && (
@@ -291,9 +325,9 @@ function App() {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, theme = "paper" }: { children: React.ReactNode; theme?: "paper" | "focus" }) {
   return (
-    <div className="device-frame">
+    <div className={`device-frame theme-${theme}`}>
       <main className="app-shell" aria-live="polite">{children}</main>
     </div>
   );
@@ -629,13 +663,13 @@ function CalendarPage({
           <div>
             <p className="eyebrow">{currentMonth} 月 {selectedDay} 日详情</p>
             <h2 style={{ marginBottom: 4 }}>{selected ? `+${selected.awarded_points} 积分` : "未打卡"}</h2>
-            <p style={{ margin: 0, color: "var(--muted)" }}>
-              {selected ? `综合评分 ${selected.total_score ?? "--"}，学习记录已入账。` : "完成一次学习记录后，这一天会亮起来。"}
-            </p>
+            {!selected && (
+              <p style={{ margin: 0, color: "var(--muted)" }}>完成一次学习记录后，这一天会亮起来。</p>
+            )}
           </div>
         </div>
       </article>
-      <h2 className="section-title energy-title">本月学习能量</h2>
+      <h2 className="section-title energy-title">本周学习能量</h2>
       <article className="card energy-bars" aria-label="最近七次分数柱状图">
         {(calendar?.days ?? []).slice(-7).map((item) => (
           <div className="score-bar" aria-label={`${item.day} 日 ${item.total_score ?? 0} 分`} key={item.id}>
@@ -728,7 +762,11 @@ function ProfilePage({
   checkins,
   redemptions,
   onSignOut,
-  onRefresh
+  onRefresh,
+  onUpdateProfile,
+  theme,
+  setTheme,
+  setRoute
 }: {
   user: UserType;
   points: PointAccount | null;
@@ -736,19 +774,29 @@ function ProfilePage({
   redemptions: Redemption[];
   onSignOut: () => void;
   onRefresh: () => Promise<void>;
+  onUpdateProfile: (form: FormData) => Promise<void>;
+  theme: "paper" | "focus";
+  setTheme: (theme: "paper" | "focus") => void;
+  setRoute: (route: RouteName) => void;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const badgeItems = getBadgeItems(user, checkins, redemptions);
+
   return (
     <section className="page">
       <article className="card profile-hero">
+        <button className="profile-settings" onClick={() => setSettingsOpen(true)} aria-label="打开基础设置">
+          <Settings />
+        </button>
         <div className="profile-row">
           <div className="profile-row" style={{ gap: 12 }}>
-            <div className="avatar large" role="img" aria-label="用户头像" />
+            <Avatar user={user} large />
             <div>
               <p className="eyebrow">{levelName(user.current_points)}</p>
               <h1>{user.display_name}</h1>
             </div>
           </div>
-          <span className="pill">{user.current_points} 分</span>
+          <span className="point-ticket"><strong>{user.current_points}</strong><small>积分</small></span>
         </div>
         <div className="level-card">
           <div className="sheet-row">
@@ -760,24 +808,199 @@ function ProfilePage({
           </div>
         </div>
       </article>
-      <h2 className="section-title">徽章墙</h2>
+      <button className="section-link profile-section-title" onClick={() => setRoute("badges")}>
+        <h2>徽章墙</h2>
+        <ChevronRight />
+      </button>
       <div className="badge-grid">
-        <Badge label="连续 7 天" icon={<Flame />} locked={user.streak_days < 7} />
-        <Badge label="高分学霸" icon={<Sparkles />} locked={!checkins.some((item) => (item.total_score ?? 0) >= 90)} />
-        <Badge label="月度坚持" icon={<Trophy />} locked={checkins.length < 10} />
-        <Badge label="早起学习" icon={<BookOpen />} locked />
-        <Badge label="商城达人" icon={<Gift />} locked={redemptions.length === 0} />
-        <Badge label="复盘高手" icon={<Check />} locked={checkins.length < 3} />
+        {badgeItems.map((badge) => (
+          <Badge key={badge.label} label={badge.label} icon={badge.icon} locked={badge.locked} />
+        ))}
       </div>
-      <h2 className="section-title">账户</h2>
+      <h2 className="section-title profile-section-title account-title">账户</h2>
       <div className="entry-list">
         <Entry label={`兑换记录 ${redemptions.length}`} />
         <Entry label={`积分流水 ${points?.transactions.length ?? 0}`} />
         <button className="list-item" onClick={() => onRefresh()}><span>刷新资料</span><ChevronRight /></button>
         <button className="list-item danger-entry" onClick={onSignOut}><span>退出登录</span><LogOut /></button>
       </div>
+      {settingsOpen && (
+        <SettingsSheet
+          user={user}
+          theme={theme}
+          setTheme={setTheme}
+          onClose={() => setSettingsOpen(false)}
+          onSubmit={onUpdateProfile}
+        />
+      )}
     </section>
   );
+}
+
+function Avatar({ user, large = false }: { user: UserType; large?: boolean }) {
+  return (
+    <div className={`avatar ${large ? "large" : ""}`} role="img" aria-label="用户头像">
+      {user.avatar_url && <img src={user.avatar_url} alt="" />}
+    </div>
+  );
+}
+
+function SettingsSheet({
+  user,
+  theme,
+  setTheme,
+  onClose,
+  onSubmit
+}: {
+  user: UserType;
+  theme: "paper" | "focus";
+  setTheme: (theme: "paper" | "focus") => void;
+  onClose: () => void;
+  onSubmit: (form: FormData) => Promise<void>;
+}) {
+  const [displayName, setDisplayName] = useState(user.display_name);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState(user.avatar_url ?? "");
+  const [saving, setSaving] = useState(false);
+
+  function chooseAvatar(file: File | undefined) {
+    if (!file) return;
+    setAvatarFile(file);
+    setPreview(URL.createObjectURL(file));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData();
+    form.set("display_name", displayName.trim());
+    if (avatarFile) form.set("avatar", avatarFile);
+    setSaving(true);
+    try {
+      await onSubmit(form);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-scrim" onClick={onClose} role="presentation">
+      <section className="settings-sheet" role="dialog" aria-modal="true" aria-label="基础设置" onClick={(event) => event.stopPropagation()}>
+        <div className="sheet-row">
+          <h2 style={{ margin: 0 }}>基础设置</h2>
+          <button className="sheet-close" onClick={onClose} aria-label="关闭"><X /></button>
+        </div>
+        <form className="settings-form" onSubmit={submit}>
+          <div className="avatar-editor">
+            <div className="avatar large" role="img" aria-label="头像预览">
+              {preview && <img src={preview} alt="" />}
+            </div>
+            <label className="avatar-upload">
+              上传头像
+              <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseAvatar(event.target.files?.[0])} />
+            </label>
+          </div>
+          <label className="settings-field">
+            昵称
+            <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={80} required />
+          </label>
+          <div className="settings-field">
+            <span>主题</span>
+            <div className="theme-options" role="group" aria-label="主题切换">
+              <button type="button" className={theme === "paper" ? "active" : ""} onClick={() => setTheme("paper")}>纸张</button>
+              <button type="button" className={theme === "focus" ? "active" : ""} onClick={() => setTheme("focus")}>专注</button>
+            </div>
+          </div>
+          <button className="primary-btn" disabled={saving || !displayName.trim()}>{saving ? "保存中..." : "保存设置"}</button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function BadgeDetailPage({
+  user,
+  checkins,
+  redemptions,
+  setRoute
+}: {
+  user: UserType;
+  checkins: Checkin[];
+  redemptions: Redemption[];
+  setRoute: (route: RouteName) => void;
+}) {
+  const badgeItems = getBadgeItems(user, checkins, redemptions);
+  const unlockedCount = badgeItems.filter((item) => !item.locked).length;
+
+  return (
+    <section className="page badge-detail-page">
+      <header className="detail-top">
+        <button className="round-tool" onClick={() => setRoute("profile")} aria-label="返回我的"><ChevronLeft /></button>
+        <div>
+          <p className="eyebrow">成长收藏</p>
+          <h1>徽章墙</h1>
+        </div>
+        <span className="point-ticket detail-ticket"><strong>{unlockedCount}</strong><small>/ {badgeItems.length}</small></span>
+      </header>
+      <article className="badge-summary card">
+        <strong>{unlockedCount ? "继续把学习变成收藏" : "第一枚徽章正在路上"}</strong>
+        <p>完成打卡、兑换奖励和保持连续学习后，徽章会自动点亮。</p>
+      </article>
+      <div className="badge-detail-grid">
+        {badgeItems.map((badge) => (
+          <article className={`badge-detail-card ${badge.locked ? "locked" : ""}`} key={badge.label}>
+            <div className="badge-icon">{badge.icon}</div>
+            <div>
+              <h2>{badge.label}</h2>
+              <p>{badge.description}</p>
+              <span>{badge.locked ? "待解锁" : "已获得"}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function getBadgeItems(user: UserType, checkins: Checkin[], redemptions: Redemption[]) {
+  return [
+    {
+      label: "连续 7 天",
+      icon: <Flame />,
+      locked: user.streak_days < 7,
+      description: "连续完成 7 天学习打卡。"
+    },
+    {
+      label: "高分学霸",
+      icon: <Sparkles />,
+      locked: !checkins.some((item) => (item.total_score ?? 0) >= 90),
+      description: "任意一次 AI 综合评分达到 90 分。"
+    },
+    {
+      label: "月度坚持",
+      icon: <Trophy />,
+      locked: checkins.length < 10,
+      description: "本账号累计完成 10 次学习记录。"
+    },
+    {
+      label: "早起学习",
+      icon: <BookOpen />,
+      locked: true,
+      description: "清晨完成学习记录后解锁。"
+    },
+    {
+      label: "商城达人",
+      icon: <Gift />,
+      locked: redemptions.length === 0,
+      description: "完成一次积分商城兑换。"
+    },
+    {
+      label: "复盘高手",
+      icon: <Check />,
+      locked: checkins.length < 3,
+      description: "累计完成 3 次学习复盘。"
+    }
+  ];
 }
 
 function BottomNav({ route, setRoute }: { route: RouteName; setRoute: (route: RouteName) => void }) {
@@ -788,12 +1011,13 @@ function BottomNav({ route, setRoute }: { route: RouteName; setRoute: (route: Ro
     ["shop", "商城", <Gift />],
     ["profile", "我的", <User />]
   ];
+  const activeRoute = route === "badges" ? "profile" : route;
 
   return (
     <nav className="nav-bar" aria-label="底部导航">
       {items.map(([itemRoute, label, icon], index) => (
         <button
-          className={`nav-item ${itemRoute === "checkin" ? "compose" : ""} ${route === itemRoute ? "active" : ""}`}
+          className={`nav-item ${itemRoute === "checkin" ? "compose" : ""} ${activeRoute === itemRoute ? "active" : ""}`}
           key={itemRoute}
           onClick={() => setRoute(itemRoute)}
           aria-label={label}
@@ -897,7 +1121,7 @@ function CalendarCell({
       aria-label={`${currentMonth} 月 ${day} 日${record ? `，${score} 分` : "，未打卡"}`}
     >
       {day}
-      <small>{record ? `${score}分` : "未打卡"}</small>
+      <small>{record ? `${score}分` : ""}</small>
     </button>
   );
 }
