@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from backend.app.api.routes import auth, users
 from backend.app.core.config import get_settings
 
 
@@ -14,6 +15,9 @@ app = FastAPI(
     description="Backend API for the AI learning check-in and points reward system.",
     version="0.1.0",
 )
+
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 
 @app.get("/api/health")

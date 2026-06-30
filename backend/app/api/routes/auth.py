@@ -1,0 +1,49 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.app.core.security import create_access_token
+from backend.app.db.session import get_db_session
+from backend.app.schemas.auth import LoginRequest, TokenResponse
+from backend.app.schemas.user import UserCreate
+from backend.app.services.user_service import (
+    authenticate_user,
+    create_user,
+    get_existing_user_for_create,
+)
+
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_in: UserCreate,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> TokenResponse:
+    existing_user = await get_existing_user_for_create(session, user_in)
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already exists",
+        )
+
+    user = await create_user(session, user_in)
+    return TokenResponse(access_token=create_access_token(str(user.id)), user=user)
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    login_in: LoginRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> TokenResponse:
+    user = await authenticate_user(session, login_in.identifier, login_in.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return TokenResponse(access_token=create_access_token(str(user.id)), user=user)
