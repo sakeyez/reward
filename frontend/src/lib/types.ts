@@ -125,7 +125,7 @@ export interface Redemption {
   created_at: string;
 }
 
-export type RouteName = "home" | "checkin" | "result" | "calendar" | "shop" | "profile" | "badges";
+export type RouteName = "home" | "checkin" | "result" | "calendar" | "shopGoal" | "shop" | "profile" | "badges";
 
 export interface AdminSummary {
   users_total: number;

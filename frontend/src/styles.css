@@ -476,6 +476,36 @@ h3 {
   white-space: nowrap;
 }
 
+.dogecoin-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dogecoin-amount img {
+  width: 1.25em;
+  height: 1.25em;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.dogecoin-amount span {
+  font-weight: 820;
+}
+
+.dogecoin-amount small {
+  font-size: 0.72em;
+  font-weight: 800;
+}
+
+.compact-coin img {
+  width: 1em;
+  height: 1em;
+}
+
 .pill.mint,
 .coach-chip {
   background: var(--primary-soft);
@@ -1335,6 +1365,20 @@ label.composer-mic {
   font-weight: 800;
 }
 
+.admin-dogecoin-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-dogecoin-amount img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .tag-active,
 .tag-fulfilled,
 .tag-checkin_reward,
@@ -1562,6 +1606,10 @@ label.composer-mic {
   font-weight: 800;
 }
 
+.result-score .dogecoin-amount {
+  justify-content: center;
+}
+
 .result-actions {
   display: flex;
   gap: 10px;
@@ -1684,6 +1732,286 @@ label.composer-mic {
   padding: 16px;
 }
 
+.savings-page {
+  padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  background:
+    linear-gradient(180deg, rgba(255, 240, 232, 0.86), transparent 270px),
+    var(--paper);
+}
+
+.savings-top {
+  display: grid;
+  grid-template-columns: 1fr 56px;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.savings-top h1 {
+  font-size: 31px;
+}
+
+.paw-badge {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.paw-badge svg {
+  width: 27px;
+  height: 27px;
+  stroke-width: 2.4;
+}
+
+.piggy-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: 22px 18px 18px;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, #fff 0%, #fff8f2 100%);
+  box-shadow: var(--shadow);
+}
+
+.piggy-card.complete {
+  background:
+    linear-gradient(180deg, #fff 0%, #eef7f0 100%);
+}
+
+.piggy-bank {
+  --progress: 0%;
+  --fill-height: 0%;
+  position: relative;
+  width: min(250px, 80vw);
+  aspect-ratio: 1.16;
+  margin-top: 8px;
+}
+
+.piggy-bank::before,
+.piggy-bank::after,
+.piggy-fill,
+.piggy-face,
+.coin-slot,
+.coin-rain span {
+  position: absolute;
+}
+
+.piggy-bank::before {
+  content: "";
+  inset: 24% 7% 12%;
+  border: 7px solid #2e2924;
+  border-radius: 50% 52% 45% 46%;
+  background:
+    linear-gradient(0deg, rgba(255, 90, 20, 0.24) 0 var(--progress), rgba(255,255,255,0.84) var(--progress) 100%),
+    #fff;
+  box-shadow: inset 0 -20px 0 rgba(255, 90, 20, 0.08), 0 20px 34px rgba(31, 28, 23, 0.12);
+}
+
+.piggy-bank::after {
+  content: "";
+  width: 50px;
+  height: 50px;
+  top: 14%;
+  right: 12%;
+  border: 7px solid #2e2924;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0 26px 0 0;
+  transform: rotate(-18deg);
+  background: #fff2ea;
+}
+
+.piggy-fill {
+  inset: calc(88% - var(--fill-height)) 13% 18% 13%;
+  border-radius: 0 0 999px 999px;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255,255,255,.52) 0 8px, transparent 9px),
+    linear-gradient(180deg, #ffb36b, var(--primary));
+  opacity: 0.88;
+  clip-path: ellipse(50% 46% at 50% 54%);
+}
+
+.coin-slot {
+  width: 82px;
+  height: 11px;
+  top: 28%;
+  left: 34%;
+  z-index: 2;
+  border-radius: 999px;
+  background: #2e2924;
+}
+
+.coin-rain span {
+  width: 24px;
+  height: 24px;
+  top: 0;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: inset -3px -3px 0 rgba(0,0,0,.12);
+}
+
+.coin-rain span:nth-child(1) {
+  left: 36%;
+}
+
+.coin-rain span:nth-child(2) {
+  left: 49%;
+  top: 8%;
+  transform: scale(.8);
+}
+
+.coin-rain span:nth-child(3) {
+  left: 60%;
+  top: 2%;
+  transform: scale(.68);
+}
+
+.piggy-face {
+  z-index: 3;
+  left: 57%;
+  top: 50%;
+  display: flex;
+  gap: 25px;
+}
+
+.piggy-face span {
+  position: static;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2e2924;
+}
+
+.piggy-copy {
+  width: 100%;
+}
+
+.piggy-copy h2 {
+  margin-bottom: 12px;
+  font-size: 26px;
+}
+
+.goal-progress-row,
+.goal-total,
+.shop-dock,
+.dock-balance,
+.dock-shop-link {
+  display: flex;
+  align-items: center;
+}
+
+.goal-progress-row {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-progress-row strong {
+  font-size: 34px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-progress-row span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 720;
+  text-align: right;
+}
+
+.savings-track {
+  margin-top: 12px;
+  background: #ece4da;
+}
+
+.goal-total {
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.goal-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.goal-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.goal-form input {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  padding: 0 13px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.shop-dock {
+  position: fixed;
+  right: max(14px, calc((100vw - 430px) / 2 + 14px));
+  bottom: calc(98px + env(safe-area-inset-bottom));
+  z-index: 41;
+  gap: 8px;
+  max-width: min(372px, calc(100vw - 28px));
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  box-shadow: 0 12px 32px rgba(31, 28, 23, 0.14);
+  backdrop-filter: blur(18px);
+}
+
+.dock-balance {
+  min-height: 42px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: #a43d12;
+}
+
+.dock-shop-link {
+  min-height: 42px;
+  gap: 3px;
+  padding: 0 10px 0 14px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.dock-shop-link svg,
+.compact-back svg {
+  width: 21px;
+  height: 21px;
+}
+
+.compact-back {
+  width: 44px;
+  height: 44px;
+}
+
 .thumb-row {
   display: grid;
   grid-template-columns: 92px 1fr;
@@ -1708,6 +2036,16 @@ label.composer-mic {
   margin-top: 4px;
   font-size: 36px;
   font-variant-numeric: tabular-nums;
+}
+
+.shop-balance strong .dogecoin-amount img {
+  width: 34px;
+  height: 34px;
+}
+
+.shop-balance strong .dogecoin-amount small {
+  color: rgba(255,255,255,.72);
+  font-size: 14px;
 }
 
 .shop-balance span {
@@ -1802,6 +2140,11 @@ label.composer-mic {
   color: #a43d12;
   font-size: 13px;
   font-weight: 800;
+}
+
+.points .dogecoin-amount img {
+  width: 18px;
+  height: 18px;
 }
 
 .stock {
@@ -1965,21 +2308,45 @@ label.composer-mic {
   white-space: nowrap;
 }
 
-.point-ticket strong {
+.point-ticket .dogecoin-amount > span {
   color: var(--primary);
   font-size: 18px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.point-ticket small {
+.point-ticket .dogecoin-amount small {
   color: #8f4b2e;
   font-size: 12px;
   font-weight: 800;
 }
 
+.point-ticket .dogecoin-amount img {
+  width: 24px;
+  height: 24px;
+}
+
 .detail-ticket {
-  transform: none;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.detail-ticket strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.detail-ticket small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .level-card {

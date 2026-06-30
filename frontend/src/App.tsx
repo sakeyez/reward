@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   Mic,
+  PawPrint,
   Pencil,
   Plus,
   Send,
@@ -23,6 +24,7 @@ import {
   X
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import dogecoinIcon from "./assets/dogecoin.png";
 import { api, ApiError } from "./lib/api";
 import type {
   Checkin,
@@ -37,6 +39,11 @@ import type {
 
 const TOKEN_KEY = "reward_access_token";
 const THEME_KEY = "reward_theme";
+const SAVINGS_GOAL_KEY = "reward_savings_goal";
+const DEFAULT_SAVINGS_GOAL = {
+  name: "买一条裙子",
+  target: 5000
+};
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -49,6 +56,11 @@ const artByCategory: Record<string, string> = {
   "课程": "course",
   "虚拟奖励": "virtual"
 };
+
+interface SavingsGoal {
+  name: string;
+  target: number;
+}
 
 function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
@@ -63,6 +75,7 @@ function App() {
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [activeCategory, setActiveCategory] = useState("全部");
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
+  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(() => readSavingsGoal());
   const [loading, setLoading] = useState(Boolean(token));
   const [message, setMessage] = useState("");
   const [theme, setTheme] = useState<"paper" | "focus">(() => {
@@ -164,6 +177,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(SAVINGS_GOAL_KEY, JSON.stringify(savingsGoal));
+  }, [savingsGoal]);
 
   async function handleAuth(mode: "login" | "register", form: FormData) {
     try {
@@ -281,6 +298,14 @@ function App() {
           user={user}
         />
       )}
+      {route === "shopGoal" && (
+        <SavingsGoalPage
+          user={user}
+          goal={savingsGoal}
+          setGoal={setSavingsGoal}
+          setRoute={setRoute}
+        />
+      )}
       {route === "shop" && (
         <ShopPage
           user={user}
@@ -288,6 +313,7 @@ function App() {
           activeCategory={activeCategory}
           setActiveCategory={setActiveCategory}
           setSelectedReward={setSelectedReward}
+          setRoute={setRoute}
         />
       )}
       {route === "profile" && (
@@ -456,7 +482,7 @@ function HomePage({
             <p className="eyebrow">今日学习小任务</p>
             <div className="goal">上传学习成果，收下今天的成长分</div>
             <div className="status-line">
-              <span className="status-chip">最高 +100 积分</span>
+              <span className="status-chip">最高 <DogecoinAmount value="+100" compact /></span>
               <span className="status-chip">{completedToday ? "已完成" : "待打卡"}</span>
             </div>
           </div>
@@ -466,13 +492,13 @@ function HomePage({
       <h2 className="section-title">本周学习表现</h2>
       <div className="metrics-grid">
         <Metric label="最近得分" value={latestCheckin?.total_score?.toString() ?? "--"} />
-        <Metric label="累计积分" value={String(user.current_points)} />
+        <Metric label="累计狗狗币" value={String(user.current_points)} />
         <Metric label="连续打卡" value={String(user.streak_days)} />
       </div>
       <article className="card task-card compact history-card">
-        <p className="eyebrow">积分流水</p>
-        <h3>{monthPoints > 0 ? `最近收入 +${monthPoints}` : "还没有积分记录"}</h3>
-        <p>{points?.transactions[0]?.reason ?? "完成一次打卡后，这里会出现你的积分变化。"}</p>
+        <p className="eyebrow">狗狗币流水</p>
+        <h3>{monthPoints > 0 ? <DogecoinAmount value={`+${monthPoints}`} /> : "还没有狗狗币记录"}</h3>
+        <p>{points?.transactions[0]?.reason.replaceAll("积分", "狗狗币") ?? "完成一次打卡后，这里会出现你的狗狗币变化。"}</p>
       </article>
     </section>
   );
@@ -590,7 +616,7 @@ function ResultPage({
         <div className="result-score">
           <div>
             <strong>{checkin?.total_score ?? "--"}</strong>
-            <span>+{checkin?.awarded_points ?? 0} 积分</span>
+            <span><DogecoinAmount value={`+${checkin?.awarded_points ?? 0}`} /></span>
           </div>
         </div>
       </article>
@@ -599,12 +625,12 @@ function ResultPage({
           <h2>AI 评价摘要</h2>
           <p style={{ color: "var(--muted)" }}>{checkin.ai_comment}</p>
           <Dimensions dimensions={checkin.score_dimensions} />
-          <p className="ai-note"><Check /> 已累计到你的账户，当前积分 {user.current_points}</p>
+          <p className="ai-note"><Check /> 已累计到你的账户，当前狗狗币 <DogecoinAmount value={user.current_points} /></p>
         </article>
       )}
       <div className="result-actions">
         <button className="secondary-btn" onClick={() => setRoute("calendar")}>查看学习日历</button>
-        <button className="primary-btn" onClick={() => setRoute("shop")}>去商城兑换</button>
+        <button className="primary-btn" onClick={() => setRoute("shopGoal")}>去存钱罐</button>
       </div>
     </section>
   );
@@ -638,7 +664,7 @@ function CalendarPage({
         <span className="pill mint">{user.streak_days} 天连续</span>
       </div>
       <div className="calendar-stats">
-        <Metric label="本月积分" value={String(monthPoints)} />
+        <Metric label="本月狗狗币" value={String(monthPoints)} />
         <Metric label="平均分" value={averageScore ? averageScore.toFixed(1) : "--"} />
         <Metric label="打卡天数" value={String(calendar?.days.length ?? 0)} />
       </div>
@@ -662,7 +688,7 @@ function CalendarPage({
           <div className="paper-preview thumb-mini" />
           <div>
             <p className="eyebrow">{currentMonth} 月 {selectedDay} 日详情</p>
-            <h2 style={{ marginBottom: 4 }}>{selected ? `+${selected.awarded_points} 积分` : "未打卡"}</h2>
+            <h2 style={{ marginBottom: 4 }}>{selected ? <DogecoinAmount value={`+${selected.awarded_points}`} /> : "未打卡"}</h2>
             {!selected && (
               <p style={{ margin: 0, color: "var(--muted)" }}>完成一次学习记录后，这一天会亮起来。</p>
             )}
@@ -685,18 +711,115 @@ function CalendarPage({
   );
 }
 
+function SavingsGoalPage({
+  user,
+  goal,
+  setGoal,
+  setRoute
+}: {
+  user: UserType;
+  goal: SavingsGoal;
+  setGoal: (goal: SavingsGoal) => void;
+  setRoute: (route: RouteName) => void;
+}) {
+  const [draftName, setDraftName] = useState(goal.name);
+  const [draftTarget, setDraftTarget] = useState(String(goal.target));
+  const progress = Math.min(user.current_points / goal.target, 1);
+  const percent = Math.round(progress * 100);
+  const fillHeight = Math.round(progress * 54);
+  const remaining = Math.max(goal.target - user.current_points, 0);
+  const achieved = remaining === 0;
+
+  function saveGoal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextTarget = Math.max(1, Math.round(Number(draftTarget) || DEFAULT_SAVINGS_GOAL.target));
+    setGoal({
+      name: draftName.trim() || DEFAULT_SAVINGS_GOAL.name,
+      target: nextTarget
+    });
+  }
+
+  return (
+    <section className="page savings-page">
+      <header className="savings-top">
+        <div>
+          <p className="eyebrow">目标存钱罐</p>
+          <h1>把狗狗币攒成想要的东西</h1>
+        </div>
+        <span className="paw-badge" aria-hidden="true"><PawPrint /></span>
+      </header>
+      <article className={`piggy-card ${achieved ? "complete" : ""}`} aria-label={`${goal.name} 目标进度 ${percent}%`}>
+        <div className="piggy-bank" style={{ "--progress": `${percent}%`, "--fill-height": `${fillHeight}%` } as React.CSSProperties}>
+          <div className="coin-slot" />
+          <div className="coin-rain">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="piggy-fill" />
+          <div className="piggy-face">
+            <span />
+            <span />
+          </div>
+        </div>
+        <div className="piggy-copy">
+          <p className="eyebrow">{achieved ? "目标达成" : "正在存"}</p>
+          <h2>{goal.name}</h2>
+          <div className="goal-progress-row">
+            <strong>{percent}%</strong>
+            <span>{achieved ? "已经存满啦" : `还差 ${remaining} 狗狗币`}</span>
+          </div>
+          <div className="progress-track savings-track">
+            <div className="progress-fill" style={{ width: `${percent}%` }} />
+          </div>
+          <div className="goal-total">
+            <DogecoinAmount value={user.current_points} />
+            <span>/</span>
+            <DogecoinAmount value={goal.target} />
+          </div>
+        </div>
+      </article>
+      <form className="goal-form" onSubmit={saveGoal}>
+        <label>
+          想买什么
+          <input value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={30} />
+        </label>
+        <label>
+          需要多少狗狗币
+          <input
+            value={draftTarget}
+            onChange={(event) => setDraftTarget(event.target.value)}
+            inputMode="numeric"
+            pattern="[0-9]*"
+          />
+        </label>
+        <button className="primary-btn" type="submit">保存目标</button>
+      </form>
+      <div className="shop-dock" aria-label="狗狗币和商城入口">
+        <span className="dock-balance"><DogecoinAmount value={user.current_points} /></span>
+        <button className="dock-shop-link" onClick={() => setRoute("shop")}>
+          <span>商城</span>
+          <ChevronRight />
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ShopPage({
   user,
   rewards,
   activeCategory,
   setActiveCategory,
-  setSelectedReward
+  setSelectedReward,
+  setRoute
 }: {
   user: UserType;
   rewards: Reward[];
   activeCategory: string;
   setActiveCategory: (category: string) => void;
   setSelectedReward: (reward: Reward) => void;
+  setRoute: (route: RouteName) => void;
 }) {
   const categories = useMemo(() => ["全部", ...Array.from(new Set(rewards.map((item) => item.category)))], [rewards]);
   const filtered = rewards.filter((item) => activeCategory === "全部" || item.category === activeCategory);
@@ -704,16 +827,17 @@ function ShopPage({
   return (
     <section className="page">
       <div className="title-row">
+        <button className="round-tool compact-back" onClick={() => setRoute("shopGoal")} aria-label="返回存钱罐"><ChevronLeft /></button>
         <div>
           <p className="eyebrow">奖励中心</p>
-          <h1>积分商城</h1>
+          <h1>狗狗币商城</h1>
         </div>
-        <span className="pill">{user.current_points} 分</span>
+        <span className="pill"><DogecoinAmount value={user.current_points} /></span>
       </div>
       <article className="card shop-balance">
-        <p className="eyebrow" style={{ color: "rgba(255,255,255,.78)" }}>我的积分</p>
-        <strong>{user.current_points}</strong>
-        <span>攒下一点点努力，换一份小奖励。</span>
+        <p className="eyebrow" style={{ color: "rgba(255,255,255,.78)" }}>我的狗狗币</p>
+        <strong><DogecoinAmount value={user.current_points} /></strong>
+        <span>攒下一枚枚狗狗币，换一份小奖励。</span>
       </article>
       <div className="tab-scroll" role="tablist" aria-label="商品分类">
         {categories.map((category) => (
@@ -734,7 +858,7 @@ function ShopPage({
             className="reward-card"
             key={reward.id}
             onClick={() => setSelectedReward(reward)}
-            aria-label={`${reward.name}，需要 ${reward.cost_points} 积分`}
+            aria-label={`${reward.name}，需要 ${reward.cost_points} 狗狗币`}
           >
             {reward.image_url ? (
               <img className="product-image" src={reward.image_url} alt={reward.name} />
@@ -744,7 +868,7 @@ function ShopPage({
             <h3>{reward.name}</h3>
             <p className="reward-description">{reward.description}</p>
             <div className="product-meta">
-              <span className="points">{reward.cost_points} 积分</span>
+              <span className="points"><DogecoinAmount value={reward.cost_points} /></span>
             </div>
             <span className={`stock ${reward.can_redeem ? "" : "locked"}`}>
               {reward.can_redeem ? "可兑换" : `还差 ${reward.points_shortfall}`}
@@ -796,7 +920,7 @@ function ProfilePage({
               <h1>{user.display_name}</h1>
             </div>
           </div>
-          <span className="point-ticket"><strong>{user.current_points}</strong><small>积分</small></span>
+          <span className="point-ticket"><DogecoinAmount value={user.current_points} /></span>
         </div>
         <div className="level-card">
           <div className="sheet-row">
@@ -820,7 +944,7 @@ function ProfilePage({
       <h2 className="section-title profile-section-title account-title">账户</h2>
       <div className="entry-list">
         <Entry label={`兑换记录 ${redemptions.length}`} />
-        <Entry label={`积分流水 ${points?.transactions.length ?? 0}`} />
+        <Entry label={`狗狗币流水 ${points?.transactions.length ?? 0}`} />
         <button className="list-item" onClick={() => onRefresh()}><span>刷新资料</span><ChevronRight /></button>
         <button className="list-item danger-entry" onClick={onSignOut}><span>退出登录</span><LogOut /></button>
       </div>
@@ -940,7 +1064,7 @@ function BadgeDetailPage({
           <p className="eyebrow">成长收藏</p>
           <h1>徽章墙</h1>
         </div>
-        <span className="point-ticket detail-ticket"><strong>{unlockedCount}</strong><small>/ {badgeItems.length}</small></span>
+        <span className="detail-ticket"><strong>{unlockedCount}</strong><small>/ {badgeItems.length}</small></span>
       </header>
       <article className="badge-summary card">
         <strong>{unlockedCount ? "继续把学习变成收藏" : "第一枚徽章正在路上"}</strong>
@@ -992,7 +1116,7 @@ function getBadgeItems(user: UserType, checkins: Checkin[], redemptions: Redempt
       label: "商城达人",
       icon: <Gift />,
       locked: redemptions.length === 0,
-      description: "完成一次积分商城兑换。"
+      description: "完成一次狗狗币商城兑换。"
     },
     {
       label: "复盘高手",
@@ -1008,10 +1132,10 @@ function BottomNav({ route, setRoute }: { route: RouteName; setRoute: (route: Ro
     ["home", "首页", <Home />],
     ["calendar", "日历", <Calendar />],
     ["checkin", "打卡", <Plus />],
-    ["shop", "商城", <Gift />],
+    ["shopGoal", "商城", <PawPrint />],
     ["profile", "我的", <User />]
   ];
-  const activeRoute = route === "badges" ? "profile" : route;
+  const activeRoute = route === "badges" ? "profile" : route === "shop" ? "shopGoal" : route;
 
   return (
     <nav className="nav-bar" aria-label="底部导航">
@@ -1053,12 +1177,12 @@ function RedeemModal({
           <div>
             <h3>{reward.name}</h3>
             <p style={{ margin: 0, color: "var(--muted)" }}>
-              消耗 {reward.cost_points} 积分，兑换后剩余 {user.current_points - reward.cost_points}
+              消耗 {reward.cost_points} 狗狗币，兑换后剩余 {user.current_points - reward.cost_points}
             </p>
           </div>
         </div>
         <button className="primary-btn" disabled={!reward.can_redeem} onClick={onConfirm}>
-          {reward.can_redeem ? "确认兑换" : `积分不足，还差 ${reward.points_shortfall}`}
+          {reward.can_redeem ? "确认兑换" : `狗狗币不足，还差 ${reward.points_shortfall}`}
         </button>
       </section>
     </div>
@@ -1130,6 +1254,16 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <article className="metric-card"><span>{label}</span><strong>{value}</strong></article>;
 }
 
+function DogecoinAmount({ value, compact = false }: { value: string | number; compact?: boolean }) {
+  return (
+    <span className={`dogecoin-amount ${compact ? "compact-coin" : ""}`}>
+      <img src={dogecoinIcon} alt="" />
+      <span>{value}</span>
+      <small>狗狗币</small>
+    </span>
+  );
+}
+
 function EnergyRing({ value, label, compact = false }: { value: number; label: string; compact?: boolean }) {
   return (
     <div className={`energy-ring ${compact ? "compact-ring" : ""}`} style={{ "--value": value } as React.CSSProperties}>
@@ -1161,6 +1295,21 @@ function readableError(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return "请求失败，请稍后再试";
+}
+
+function readSavingsGoal(): SavingsGoal {
+  const fallback = { ...DEFAULT_SAVINGS_GOAL };
+  try {
+    const raw = localStorage.getItem(SAVINGS_GOAL_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<SavingsGoal>;
+    return {
+      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
+      target: typeof parsed.target === "number" && parsed.target > 0 ? parsed.target : fallback.target
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 function formatDateInput(date: Date): string {
