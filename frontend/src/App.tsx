@@ -48,6 +48,29 @@ const artByCategory: Record<string, string> = {
   "虚拟奖励": "virtual"
 };
 
+const authQuotes = [
+  "学如逆水行舟，不进则退。",
+  "温故而知新，可以为师矣。",
+  "知不足而奋进，望远山而前行。",
+  "不积跬步，无以至千里。",
+  "书山有路勤为径。",
+  "学而不思则罔，思而不学则殆。",
+  "日日行，不怕千万里。",
+  "锲而不舍，金石可镂。",
+  "少年辛苦终身事，莫向光阴惰寸功。",
+  "读书破万卷，下笔如有神。",
+  "纸上得来终觉浅，绝知此事要躬行。",
+  "一寸光阴一寸金。",
+  "业精于勤，荒于嬉。",
+  "敏而好学，不耻下问。",
+  "路虽远，行则将至。",
+  "学问勤中得。",
+  "心之所向，素履以往。",
+  "今日多一分努力，明日多一分从容。",
+  "把难题拆小，把进步攒大。",
+  "每一次复盘，都是下一次起跑。"
+];
+
 interface SavingsGoal {
   name: string;
   target: number;
@@ -426,6 +449,7 @@ function AuthPage({
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [submitting, setSubmitting] = useState(false);
+  const [quote] = useState(() => authQuotes[Math.floor(Math.random() * authQuotes.length)]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -440,8 +464,8 @@ function AuthPage({
   return (
     <section className="page auth-page">
       <div className="auth-hero">
-        <p className="eyebrow">AI 学习打卡</p>
-        <h1>把今天学到的东西，变成明天的奖励。</h1>
+        <p className="eyebrow">学习打卡</p>
+        <h1>{quote}</h1>
       </div>
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-switch" role="tablist" aria-label="认证方式">
