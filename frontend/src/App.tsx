@@ -206,7 +206,16 @@ function App() {
     }
   }
 
-  async function handleSubmitCheckin(contentText: string, imageFile: File | null) {
+  async function handleSubmitCheckin(
+    contentText: string,
+    imageFile: File | null,
+    details?: {
+      studyTimeMinutes: number;
+      questionCount: number;
+      noteImageFile: File | null;
+      exerciseImageFile: File | null;
+    }
+  ) {
     if (!token) return;
     try {
       setMessage("");
@@ -214,6 +223,12 @@ function App() {
       form.set("checkin_date", todayIso);
       if (contentText.trim()) form.set("content_text", contentText.trim());
       if (imageFile) form.set("image", imageFile);
+      if (details) {
+        form.set("study_time_minutes", String(details.studyTimeMinutes));
+        form.set("question_count", String(details.questionCount));
+        if (details.noteImageFile) form.set("note_image", details.noteImageFile);
+        if (details.exerciseImageFile) form.set("exercise_image", details.exerciseImageFile);
+      }
       const created = await api.createCheckin(token, form);
       setLatestCheckin(created);
       setRoute("checkin");
@@ -509,7 +524,16 @@ function CheckinPage({
   message
 }: {
   latestCheckin: Checkin | null;
-  onSubmit: (contentText: string, imageFile: File | null) => Promise<void>;
+  onSubmit: (
+    contentText: string,
+    imageFile: File | null,
+    details?: {
+      studyTimeMinutes: number;
+      questionCount: number;
+      noteImageFile: File | null;
+      exerciseImageFile: File | null;
+    }
+  ) => Promise<void>;
   setRoute: (route: RouteName) => void;
   message: string;
 }) {
@@ -547,7 +571,12 @@ function CheckinPage({
     }
     setSubmitting(true);
     try {
-      await onSubmit(content, imageFile);
+      await onSubmit(content, imageFile, {
+        studyTimeMinutes: studyHours * 60,
+        questionCount: Number(questionCount.trim() || 0),
+        noteImageFile,
+        exerciseImageFile
+      });
       setQuestionCount("");
       setNoteImageFile(null);
       setExerciseImageFile(null);
@@ -1606,10 +1635,10 @@ function readStreakFromComment(value: string | null): number | null {
 }
 
 function calculateDisplayReward(checkin: Checkin): number {
-  if (checkin.awarded_points > 0 && checkin.awarded_points !== checkin.total_score) {
+  if (checkin.awarded_points > 0) {
     return checkin.awarded_points;
   }
-  return 10;
+  return 0;
 }
 
 function levelName(points: number): string {

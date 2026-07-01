@@ -1,3 +1,4 @@
+from backend.app.models.ai import AiSetting
 from backend.app.models.checkin import Checkin, CheckinScoreDimension, CheckinStatus
 from backend.app.models.point import PointTransaction, PointTransactionType
 from backend.app.models.reward import Redemption, RedemptionStatus, Reward, RewardStatus

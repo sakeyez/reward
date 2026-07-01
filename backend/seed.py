@@ -102,7 +102,7 @@ async def ensure_admin_user(session, roles: dict[str, Role]) -> None:
         admin.display_name = admin.display_name or "系统管理员"
         admin.status = UserStatus.active
 
-    for role_code in ("user", "admin"):
+    for role_code in ("user", "admin", "super_admin"):
         role = roles[role_code]
         result = await session.execute(
             select(UserRole).where(UserRole.user_id == admin.id, UserRole.role_id == role.id),

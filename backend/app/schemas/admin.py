@@ -18,6 +18,36 @@ class AdminSummary(BaseModel):
     rewards_total: int
 
 
+class AdminAiSettingRead(BaseModel):
+    enabled: bool
+    base_url: str
+    model: str
+    api_type: str
+    api_key_masked: str | None
+    last_test_status: str | None
+    last_test_message: str | None
+    can_edit: bool
+
+
+class AdminAiSettingUpdate(BaseModel):
+    enabled: bool | None = None
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    model: str | None = Field(default=None, min_length=1, max_length=120)
+    api_key: str | None = Field(default=None, max_length=500)
+
+
+class AdminAiSettingTest(BaseModel):
+    enabled: bool | None = None
+    base_url: str | None = Field(default=None, min_length=1, max_length=500)
+    model: str | None = Field(default=None, min_length=1, max_length=120)
+    api_key: str | None = Field(default=None, max_length=500)
+
+
+class AdminAiSettingTestResult(BaseModel):
+    status: str
+    message: str
+
+
 class AdminUserRead(BaseModel):
     id: int
     username: str | None
@@ -58,6 +88,7 @@ class AdminCheckinRead(BaseModel):
     total_score: int | None
     awarded_points: int
     ai_comment: str | None
+    ai_error: str | None
     created_at: datetime
 
 

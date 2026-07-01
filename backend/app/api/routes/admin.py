@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,6 +13,10 @@ from backend.app.models.point import PointTransaction, PointTransactionType
 from backend.app.models.reward import Redemption, RedemptionStatus, Reward, RewardStatus
 from backend.app.models.user import User, UserRole, UserStatus
 from backend.app.schemas.admin import (
+    AdminAiSettingRead,
+    AdminAiSettingTest,
+    AdminAiSettingTestResult,
+    AdminAiSettingUpdate,
     AdminCheckinList,
     AdminCheckinRead,
     AdminPointAdjustmentCreate,
@@ -30,7 +34,21 @@ from backend.app.schemas.admin import (
     AdminUserRead,
     AdminUserUpdate,
 )
+from backend.app.services.ai_scoring_service import AiScoringError, test_ai_connection
+from backend.app.services.ai_settings_service import (
+    AiRuntimeConfig,
+    API_TYPE,
+    DEFAULT_BASE_URL,
+    DEFAULT_MODEL,
+    decrypt_api_key,
+    encrypt_api_key,
+    get_or_create_ai_setting,
+    mask_api_key,
+    require_super_admin,
+    user_is_super_admin,
+)
 from backend.app.services.point_service import create_point_transaction
+from backend.app.services.checkin_service import analyze_checkin
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -73,6 +91,72 @@ async def read_admin_summary(
         pending_redemptions=pending_redemptions,
         rewards_total=rewards_total,
     )
+
+
+@router.get("/ai-settings", response_model=AdminAiSettingRead)
+async def read_admin_ai_settings(
+    admin: Annotated[User, Depends(get_current_admin_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AdminAiSettingRead:
+    setting = await get_or_create_ai_setting(session)
+    await session.commit()
+    api_key = decrypt_api_key(setting.encrypted_api_key)
+    return ai_setting_to_read(setting, api_key, user_is_super_admin(admin))
+
+
+@router.patch("/ai-settings", response_model=AdminAiSettingRead)
+async def update_admin_ai_settings(
+    setting_in: AdminAiSettingUpdate,
+    admin: Annotated[User, Depends(get_current_admin_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AdminAiSettingRead:
+    require_super_admin(admin)
+    setting = await get_or_create_ai_setting(session)
+    payload = setting_in.model_dump(exclude_unset=True)
+    if "enabled" in payload:
+        setting.enabled = bool(payload["enabled"])
+    if payload.get("base_url") is not None:
+        setting.base_url = payload["base_url"].rstrip("/") or DEFAULT_BASE_URL
+    if payload.get("model") is not None:
+        setting.model = payload["model"] or DEFAULT_MODEL
+    setting.api_type = API_TYPE
+    api_key = decrypt_api_key(setting.encrypted_api_key)
+    if "api_key" in payload and payload["api_key"] is not None:
+        api_key_candidate = payload["api_key"].strip()
+        if api_key_candidate:
+            setting.encrypted_api_key = encrypt_api_key(api_key_candidate)
+            api_key = api_key_candidate
+    await session.commit()
+    await session.refresh(setting)
+    return ai_setting_to_read(setting, api_key, True)
+
+
+@router.post("/ai-settings/test", response_model=AdminAiSettingTestResult)
+async def test_admin_ai_settings(
+    setting_in: AdminAiSettingTest,
+    admin: Annotated[User, Depends(get_current_admin_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AdminAiSettingTestResult:
+    setting = await get_or_create_ai_setting(session)
+    stored_key = decrypt_api_key(setting.encrypted_api_key)
+    runtime = AiRuntimeConfig(
+        enabled=setting_in.enabled if setting_in.enabled is not None else setting.enabled,
+        base_url=(setting_in.base_url or setting.base_url or DEFAULT_BASE_URL).rstrip("/"),
+        model=setting_in.model or setting.model or DEFAULT_MODEL,
+        api_key=(setting_in.api_key.strip() if setting_in.api_key else stored_key),
+    )
+    try:
+        message = await test_ai_connection(runtime)
+        setting.last_test_status = "success"
+        setting.last_test_message = message
+        status_text = "success"
+    except (AiScoringError, RuntimeError, ValueError) as exc:
+        message = str(exc)
+        setting.last_test_status = "failed"
+        setting.last_test_message = message
+        status_text = "failed"
+    await session.commit()
+    return AdminAiSettingTestResult(status=status_text, message=message)
 
 
 @router.get("/users", response_model=AdminUserList)
@@ -213,6 +297,59 @@ async def list_admin_checkins(
         limit=limit,
         offset=offset,
     )
+
+
+@router.delete("/checkins/{checkin_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_admin_checkin(
+    checkin_id: int,
+    admin: Annotated[User, Depends(get_current_admin_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> None:
+    result = await session.execute(
+        select(Checkin)
+        .options(selectinload(Checkin.user))
+        .where(Checkin.id == checkin_id),
+    )
+    checkin = result.scalar_one_or_none()
+    if checkin is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found")
+
+    user = checkin.user
+    if checkin.awarded_points > 0:
+        try:
+            await create_point_transaction(
+                session=session,
+                user=user,
+                transaction_type=PointTransactionType.admin_adjustment,
+                amount=-checkin.awarded_points,
+                reason=f"管理员重置 {checkin.checkin_date.isoformat()} 学习打卡，扣回奖励",
+                related_type="checkin_reset",
+                related_id=str(checkin.id),
+                created_by=admin.id,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    await session.delete(checkin)
+    user.streak_days = await recalculate_user_streak_days(session, user.id, exclude_checkin_id=checkin_id)
+    await session.commit()
+
+
+@router.post("/checkins/{checkin_id}/retry", response_model=AdminCheckinRead)
+async def retry_admin_checkin_scoring(
+    checkin_id: int,
+    _admin: Annotated[User, Depends(get_current_admin_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AdminCheckinRead:
+    checkin = await analyze_checkin(session, checkin_id)
+    if checkin is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found")
+    result = await session.execute(
+        select(Checkin)
+        .options(selectinload(Checkin.user))
+        .where(Checkin.id == checkin_id),
+    )
+    return checkin_to_admin_read(result.scalar_one())
 
 
 @router.get("/point-transactions", response_model=AdminPointTransactionList)
@@ -387,6 +524,36 @@ async def get_user_with_roles(session: AsyncSession, user_id: int) -> User | Non
     return result.scalar_one_or_none()
 
 
+async def recalculate_user_streak_days(
+    session: AsyncSession,
+    user_id: int,
+    exclude_checkin_id: int | None = None,
+) -> int:
+    filters = [Checkin.user_id == user_id, Checkin.status == CheckinStatus.scored]
+    if exclude_checkin_id is not None:
+        filters.append(Checkin.id != exclude_checkin_id)
+    result = await session.execute(
+        select(Checkin.checkin_date)
+        .where(*filters)
+        .order_by(desc(Checkin.checkin_date)),
+    )
+    dates = list(result.scalars().all())
+    if not dates:
+        return 0
+
+    streak = 1
+    previous = dates[0]
+    for current in dates[1:]:
+        if current == previous:
+            continue
+        if current == previous - timedelta(days=1):
+            streak += 1
+            previous = current
+            continue
+        break
+    return streak
+
+
 def user_to_admin_read(user: User) -> AdminUserRead:
     return AdminUserRead(
         id=user.id,
@@ -414,7 +581,21 @@ def checkin_to_admin_read(checkin: Checkin) -> AdminCheckinRead:
         total_score=checkin.total_score,
         awarded_points=checkin.awarded_points,
         ai_comment=checkin.ai_comment,
+        ai_error=checkin.ai_error,
         created_at=checkin.created_at,
+    )
+
+
+def ai_setting_to_read(setting, api_key: str | None, can_edit: bool) -> AdminAiSettingRead:
+    return AdminAiSettingRead(
+        enabled=setting.enabled,
+        base_url=setting.base_url,
+        model=setting.model,
+        api_type=setting.api_type,
+        api_key_masked=mask_api_key(api_key),
+        last_test_status=setting.last_test_status,
+        last_test_message=setting.last_test_message,
+        can_edit=can_edit,
     )
 
 

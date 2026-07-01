@@ -47,6 +47,23 @@ export interface Checkin {
   checkin_date: string;
   content_text: string | null;
   image_url: string | null;
+  note_image_url: string | null;
+  exercise_image_url: string | null;
+  study_time_minutes: number;
+  question_count: number;
+  note_words: number;
+  neatness_score: number | null;
+  accuracy_score: number | null;
+  note_quality_score: number | null;
+  risk_factor: number;
+  time_component: number;
+  note_component: number;
+  exercise_component: number;
+  neatness_coefficient: number;
+  accuracy_coefficient: number;
+  note_quality_coefficient: number;
+  streak_coefficient: number;
+  ai_error: string | null;
   status: CheckinStatus;
   total_score: number | null;
   awarded_points: number;
@@ -168,7 +185,31 @@ export interface AdminCheckin {
   total_score: number | null;
   awarded_points: number;
   ai_comment: string | null;
+  ai_error: string | null;
   created_at: string;
+}
+
+export interface AdminAiSetting {
+  enabled: boolean;
+  base_url: string;
+  model: string;
+  api_type: string;
+  api_key_masked: string | null;
+  last_test_status: string | null;
+  last_test_message: string | null;
+  can_edit: boolean;
+}
+
+export interface AdminAiSettingPayload {
+  enabled?: boolean;
+  base_url?: string;
+  model?: string;
+  api_key?: string | null;
+}
+
+export interface AdminAiSettingTestResult {
+  status: string;
+  message: string;
 }
 
 export interface AdminPointTransaction extends PointTransaction {

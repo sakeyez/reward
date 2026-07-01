@@ -1,5 +1,8 @@
 import type {
   AdminCheckin,
+  AdminAiSetting,
+  AdminAiSettingPayload,
+  AdminAiSettingTestResult,
   AdminPointTransaction,
   AdminRedemption,
   AdminReward,
@@ -160,6 +163,16 @@ export const api = {
   ) {
     return request<Paginated<AdminCheckin>>(`/api/admin/checkins${queryString(params)}`, {}, token);
   },
+  adminResetCheckin(token: string, checkinId: number) {
+    return request<void>(`/api/admin/checkins/${checkinId}`, {
+      method: "DELETE"
+    }, token);
+  },
+  adminRetryCheckin(token: string, checkinId: number) {
+    return request<AdminCheckin>(`/api/admin/checkins/${checkinId}/retry`, {
+      method: "POST"
+    }, token);
+  },
   adminPointTransactions(
     token: string,
     params: { user_id?: number; type?: PointTransactionType; limit?: number; offset?: number } = {}
@@ -192,6 +205,21 @@ export const api = {
     return request<AdminRedemption>(`/api/admin/redemptions/${redemptionId}`, {
       method: "PATCH",
       body: JSON.stringify({ status })
+    }, token);
+  },
+  adminAiSettings(token: string) {
+    return request<AdminAiSetting>("/api/admin/ai-settings", {}, token);
+  },
+  adminUpdateAiSettings(token: string, payload: AdminAiSettingPayload) {
+    return request<AdminAiSetting>("/api/admin/ai-settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    }, token);
+  },
+  adminTestAiSettings(token: string, payload: AdminAiSettingPayload) {
+    return request<AdminAiSettingTestResult>("/api/admin/ai-settings/test", {
+      method: "POST",
+      body: JSON.stringify(payload)
     }, token);
   }
 };

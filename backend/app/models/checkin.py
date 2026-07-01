@@ -2,7 +2,7 @@ import enum
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Date, Enum, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.db.base import Base, IdMixin, TimestampMixin
@@ -27,6 +27,24 @@ class Checkin(IdMixin, TimestampMixin, Base):
     checkin_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
     content_text: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(String(500))
+    note_image_url: Mapped[str | None] = mapped_column(String(500))
+    exercise_image_url: Mapped[str | None] = mapped_column(String(500))
+    study_time_minutes: Mapped[int] = mapped_column(default=0, nullable=False)
+    question_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    note_words: Mapped[int] = mapped_column(default=0, nullable=False)
+    neatness_score: Mapped[int | None]
+    accuracy_score: Mapped[int | None]
+    note_quality_score: Mapped[int | None]
+    risk_factor: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    time_component: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    note_component: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    exercise_component: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    neatness_coefficient: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    accuracy_coefficient: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    note_quality_coefficient: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    streak_coefficient: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+    ai_raw_result: Mapped[str | None] = mapped_column(Text)
+    ai_error: Mapped[str | None] = mapped_column(Text)
     status: Mapped[CheckinStatus] = mapped_column(
         Enum(CheckinStatus, name="checkin_status"),
         default=CheckinStatus.submitted,

@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.api.deps import get_current_user
@@ -13,6 +13,7 @@ from backend.app.services.checkin_service import (
     get_user_checkin_by_id,
     list_user_checkins,
     list_user_checkins_for_month,
+    analyze_checkin,
 )
 
 
@@ -23,17 +24,27 @@ router = APIRouter(prefix="/checkins", tags=["checkins"])
 async def submit_checkin(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    background_tasks: BackgroundTasks,
     content_text: Annotated[str | None, Form()] = None,
     checkin_date: Annotated[date | None, Form()] = None,
     image: Annotated[UploadFile | None, File()] = None,
+    note_image: Annotated[UploadFile | None, File()] = None,
+    exercise_image: Annotated[UploadFile | None, File()] = None,
+    study_time_minutes: Annotated[int, Form(ge=0)] = 0,
+    question_count: Annotated[int, Form(ge=0)] = 0,
 ) -> CheckinRead:
     checkin = await create_checkin(
         session=session,
         user=current_user,
         content_text=content_text,
         image=image,
+        note_image=note_image,
+        exercise_image=exercise_image,
         checkin_date=checkin_date or date.today(),
+        study_time_minutes=study_time_minutes,
+        question_count=question_count,
     )
+    background_tasks.add_task(analyze_checkin, session, checkin.id)
     return CheckinRead.model_validate(checkin)
 
 

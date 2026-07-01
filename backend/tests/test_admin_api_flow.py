@@ -11,6 +11,7 @@ from backend.app.db.session import get_db_session
 from backend.app.main import app
 from backend.app.models.reward import Reward, RewardStatus
 from backend.app.models.user import Role, User, UserRole, UserStatus
+from backend.app.services.ai_scoring_service import AiScorePayload, AiScoreResult
 
 
 @pytest.fixture()
@@ -32,7 +33,8 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
         async with TestingSessionLocal() as session:
             user_role = Role(code="user", name="普通用户")
             admin_role = Role(code="admin", name="管理员")
-            session.add_all([user_role, admin_role])
+            super_admin_role = Role(code="super_admin", name="超级管理员")
+            session.add_all([user_role, admin_role, super_admin_role])
             await session.flush()
             admin = User(
                 username="admin",
@@ -46,6 +48,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
                 [
                     UserRole(user_id=admin.id, role_id=user_role.id),
                     UserRole(user_id=admin.id, role_id=admin_role.id),
+                    UserRole(user_id=admin.id, role_id=super_admin_role.id),
                     Reward(
                         name="测试奖励",
                         category="虚拟奖励",
@@ -159,6 +162,36 @@ def test_admin_permissions_and_operations(client: TestClient) -> None:
     assert inactive.json()["status"] == "inactive"
 
 
+def test_super_admin_can_manage_ai_settings(client: TestClient) -> None:
+    user_token = register_user(client)
+    admin_token = login(client, "admin", "admin123456")
+
+    forbidden = client.get("/api/admin/ai-settings", headers=auth_headers(user_token))
+    assert forbidden.status_code == 403
+
+    updated = client.patch(
+        "/api/admin/ai-settings",
+        json={
+            "enabled": True,
+            "base_url": "https://example.test/v1",
+            "model": "test-model",
+            "api_key": "sk-test-secret",
+        },
+        headers=auth_headers(admin_token),
+    )
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["enabled"] is True
+    assert body["base_url"] == "https://example.test/v1"
+    assert body["model"] == "test-model"
+    assert body["api_key_masked"] == "sk-...cret"
+
+    loaded = client.get("/api/admin/ai-settings", headers=auth_headers(admin_token))
+    assert loaded.status_code == 200
+    assert loaded.json()["api_key_masked"] == "sk-...cret"
+    assert "sk-test-secret" not in loaded.text
+
+
 def test_admin_cancel_redemption_refunds_points_and_stock(client: TestClient) -> None:
     user_token = register_user(client)
     admin_token = login(client, "admin", "admin123456")
@@ -199,3 +232,57 @@ def test_admin_cancel_redemption_refunds_points_and_stock(client: TestClient) ->
         headers=auth_headers(admin_token),
     )
     assert processed_again.status_code == 409
+
+
+def test_admin_can_reset_checkin_and_refund_awarded_points(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_score_with_ai(checkin, config):
+        return AiScoreResult(
+            payload=AiScorePayload(
+                valid=True,
+                risk_factor=1,
+                note_words=800,
+                neatness_score=80,
+                accuracy_score=80,
+                note_quality_score=80,
+                comment="有效打卡",
+                advice="继续保持",
+            ),
+            raw_json='{"valid": true}',
+        )
+
+    monkeypatch.setattr("backend.app.services.checkin_service.score_with_ai", fake_score_with_ai)
+    user_token = register_user(client)
+    admin_token = login(client, "admin", "admin123456")
+
+    created = client.post(
+        "/api/checkins",
+        data={
+            "content_text": "今天认真复习。",
+            "checkin_date": "2026-07-01",
+            "study_time_minutes": "60",
+            "question_count": "20",
+        },
+        headers=auth_headers(user_token),
+    )
+    assert created.status_code == 201
+
+    checkins = client.get("/api/admin/checkins", headers=auth_headers(admin_token))
+    item = checkins.json()["items"][0]
+    assert item["awarded_points"] > 0
+
+    reset = client.delete(f"/api/admin/checkins/{item['id']}", headers=auth_headers(admin_token))
+    assert reset.status_code == 204
+
+    points = client.get("/api/points/me", headers=auth_headers(user_token))
+    assert points.json()["current_points"] == 0
+    assert any(transaction["related_type"] == "checkin_reset" for transaction in points.json()["transactions"])
+
+    recreated = client.post(
+        "/api/checkins",
+        data={"content_text": "重新提交", "checkin_date": "2026-07-01"},
+        headers=auth_headers(user_token),
+    )
+    assert recreated.status_code == 201

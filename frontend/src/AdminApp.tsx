@@ -9,6 +9,7 @@ import {
   Plus,
   ReceiptText,
   Search,
+  Settings,
   ShieldAlert,
   UserCog,
   Users
@@ -18,6 +19,8 @@ import dogecoinIcon from "./assets/dogecoin.png";
 import { api, ApiError } from "./lib/api";
 import type {
   AdminCheckin,
+  AdminAiSetting,
+  AdminAiSettingPayload,
   AdminPointTransaction,
   AdminRedemption,
   AdminReward,
@@ -31,7 +34,7 @@ import type {
 
 const TOKEN_KEY = "reward_access_token";
 
-type AdminTab = "overview" | "users" | "checkins" | "transactions" | "rewards" | "redemptions";
+type AdminTab = "overview" | "users" | "checkins" | "transactions" | "rewards" | "redemptions" | "aiSettings";
 
 function AdminApp() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
@@ -43,6 +46,7 @@ function AdminApp() {
   const [transactions, setTransactions] = useState<AdminPointTransaction[]>([]);
   const [rewards, setRewards] = useState<AdminReward[]>([]);
   const [redemptions, setRedemptions] = useState<AdminRedemption[]>([]);
+  const [aiSetting, setAiSetting] = useState<AdminAiSetting | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(Boolean(token));
@@ -53,7 +57,7 @@ function AdminApp() {
 
   const refreshAll = useCallback(async (activeToken = token) => {
     if (!activeToken) return;
-    const [nextUser, nextSummary, nextUsers, nextCheckins, nextTransactions, nextRewards, nextRedemptions] =
+    const [nextUser, nextSummary, nextUsers, nextCheckins, nextTransactions, nextRewards, nextRedemptions, nextAiSetting] =
       await Promise.all([
         api.me(activeToken),
         api.adminSummary(activeToken),
@@ -61,7 +65,8 @@ function AdminApp() {
         api.adminCheckins(activeToken),
         api.adminPointTransactions(activeToken),
         api.adminRewards(activeToken),
-        api.adminRedemptions(activeToken, { status: statusFilter as RedemptionStatus || undefined })
+        api.adminRedemptions(activeToken, { status: statusFilter as RedemptionStatus || undefined }),
+        api.adminAiSettings(activeToken)
       ]);
     setUser(nextUser);
     setSummary(nextSummary);
@@ -70,6 +75,7 @@ function AdminApp() {
     setTransactions(nextTransactions.items);
     setRewards(nextRewards.items);
     setRedemptions(nextRedemptions.items);
+    setAiSetting(nextAiSetting);
     setAuthMode("login");
     setMessage("");
   }, [query, statusFilter, token]);
@@ -160,6 +166,41 @@ function AdminApp() {
     });
   }
 
+  async function resetCheckin(item: AdminCheckin) {
+    if (!token) return;
+    const confirmed = window.confirm(`确定重置 ${item.user_display_name} 在 ${item.checkin_date} 的打卡吗？这会删除记录并扣回本次狗狗币。`);
+    if (!confirmed) return;
+    await runAction(async () => {
+      await api.adminResetCheckin(token, item.id);
+      await refreshAll(token);
+    });
+  }
+
+  async function retryCheckin(item: AdminCheckin) {
+    if (!token) return;
+    await runAction(async () => {
+      await api.adminRetryCheckin(token, item.id);
+      await refreshAll(token);
+    });
+  }
+
+  async function saveAiSettings(payload: AdminAiSettingPayload) {
+    if (!token) return;
+    await runAction(async () => {
+      const next = await api.adminUpdateAiSettings(token, payload);
+      setAiSetting(next);
+      setMessage("AI 配置已保存。");
+    });
+  }
+
+  async function testAiSettings(payload: AdminAiSettingPayload) {
+    if (!token) return;
+    await runAction(async () => {
+      const result = await api.adminTestAiSettings(token, payload);
+      setMessage(`${result.status}: ${result.message}`);
+    });
+  }
+
   async function runAction(action: () => Promise<void>) {
     try {
       setMessage("");
@@ -221,6 +262,7 @@ function AdminApp() {
           <AdminNavItem tab="transactions" active={tab} setTab={setTab} icon={<Coins />} label="狗狗币流水" />
           <AdminNavItem tab="rewards" active={tab} setTab={setTab} icon={<Gift />} label="奖励管理" />
           <AdminNavItem tab="redemptions" active={tab} setTab={setTab} icon={<PackageCheck />} label="兑换处理" />
+          <AdminNavItem tab="aiSettings" active={tab} setTab={setTab} icon={<Settings />} label="AI 设置" />
         </nav>
         <button className="admin-signout" onClick={signOut}><LogOut />退出登录</button>
       </aside>
@@ -243,7 +285,7 @@ function AdminApp() {
             onAdjustPoints={setPointUser}
           />
         )}
-        {tab === "checkins" && <CheckinsPanel checkins={checkins} />}
+        {tab === "checkins" && <CheckinsPanel checkins={checkins} onReset={resetCheckin} onRetry={retryCheckin} />}
         {tab === "transactions" && <TransactionsPanel transactions={transactions} />}
         {tab === "rewards" && (
           <RewardsPanel rewards={rewards} onCreate={() => setRewardForm("new")} onEdit={setRewardForm} />
@@ -255,6 +297,9 @@ function AdminApp() {
             setStatusFilter={setStatusFilter}
             onUpdate={updateRedemption}
           />
+        )}
+        {tab === "aiSettings" && (
+          <AiSettingsPanel setting={aiSetting} onSave={saveAiSettings} onTest={testAiSettings} />
         )}
       </main>
       {pointUser && (
@@ -401,11 +446,19 @@ function UsersPanel({
   );
 }
 
-function CheckinsPanel({ checkins }: { checkins: AdminCheckin[] }) {
+function CheckinsPanel({
+  checkins,
+  onReset,
+  onRetry
+}: {
+  checkins: AdminCheckin[];
+  onReset: (item: AdminCheckin) => void;
+  onRetry: (item: AdminCheckin) => void;
+}) {
   return (
     <section className="admin-panel">
       <AdminTable
-        headers={["用户", "日期", "内容", "分数", "狗狗币", "状态", "AI 评价"]}
+        headers={["用户", "日期", "内容", "分数", "狗狗币", "状态", "AI 评价 / 错误", "操作"]}
         rows={checkins.map((item) => [
           item.user_display_name,
           item.checkin_date,
@@ -413,9 +466,87 @@ function CheckinsPanel({ checkins }: { checkins: AdminCheckin[] }) {
           item.total_score ?? "-",
           <AdminDogecoinAmount value={item.awarded_points} />,
           statusTag(item.status),
-          truncate(item.ai_comment ?? "-")
+          truncate(item.ai_error ? `错误：${item.ai_error}` : item.ai_comment ?? "-"),
+          <div className="admin-actions">
+            {item.status === "analyzing" && <button onClick={() => onRetry(item)}>重试评分</button>}
+            <button onClick={() => onReset(item)}>重置</button>
+          </div>
         ])}
       />
+    </section>
+  );
+}
+
+function AiSettingsPanel({
+  setting,
+  onSave,
+  onTest
+}: {
+  setting: AdminAiSetting | null;
+  onSave: (payload: AdminAiSettingPayload) => void;
+  onTest: (payload: AdminAiSettingPayload) => void;
+}) {
+  const [enabled, setEnabled] = useState(setting?.enabled ?? false);
+  const [baseUrl, setBaseUrl] = useState(setting?.base_url ?? "https://api.openai.com/v1");
+  const [model, setModel] = useState(setting?.model ?? "gpt-4o-mini");
+  const [apiKey, setApiKey] = useState("");
+
+  useEffect(() => {
+    if (!setting) return;
+    setEnabled(setting.enabled);
+    setBaseUrl(setting.base_url);
+    setModel(setting.model);
+    setApiKey("");
+  }, [setting]);
+
+  const payload = (): AdminAiSettingPayload => ({
+    enabled,
+    base_url: baseUrl.trim(),
+    model: model.trim(),
+    api_key: apiKey.trim() || null
+  });
+  const requiresApiKey = enabled && !setting?.api_key_masked && !apiKey.trim();
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-title">
+        <h2>AI 评分配置</h2>
+        <span className={`admin-tag tag-${setting?.last_test_status ?? "inactive"}`}>
+          {setting?.last_test_status ?? "未测试"}
+        </span>
+      </div>
+      <div className="admin-ai-grid">
+        <label className="admin-check-row">
+          <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} disabled={!setting?.can_edit} />
+          启用 AI 自动评分
+        </label>
+        <label>Base URL<input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} disabled={!setting?.can_edit} /></label>
+        <label>模型<input value={model} onChange={(event) => setModel(event.target.value)} disabled={!setting?.can_edit} /></label>
+        <label>
+          API Key
+          <input
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            placeholder={setting?.api_key_masked ?? "输入 API Key"}
+            disabled={!setting?.can_edit}
+          />
+        </label>
+      </div>
+      <p className="admin-muted">
+        协议：{setting?.api_type ?? "chat_completions"}；保存后密钥只会脱敏显示。
+        {setting?.last_test_message ? ` 最近测试：${setting.last_test_message}` : ""}
+      </p>
+      <div className="admin-actions">
+        <button onClick={() => onTest(payload())}>测试连接</button>
+        <button
+          className="admin-primary compact"
+          disabled={!setting?.can_edit || requiresApiKey}
+          onClick={() => onSave(payload())}
+        >
+          保存配置
+        </button>
+      </div>
+      {requiresApiKey && <p className="admin-muted">启用 AI 自动评分前，请先填写并保存 API Key。</p>}
     </section>
   );
 }
@@ -619,7 +750,8 @@ function titleForTab(tab: AdminTab): string {
     checkins: "打卡记录",
     transactions: "狗狗币流水",
     rewards: "奖励管理",
-    redemptions: "兑换处理"
+    redemptions: "兑换处理",
+    aiSettings: "AI 设置"
   };
   return titles[tab];
 }
