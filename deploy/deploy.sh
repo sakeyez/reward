@@ -38,13 +38,19 @@ import secrets
 print(secrets.token_urlsafe(48))
 PY
 )"
+  AI_CONFIG_ENCRYPTION_KEY="$(python3 - <<'PY'
+import base64
+import secrets
+print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+PY
+)"
   cat > .env <<EOF
 APP_ENV=production
 DATABASE_URL=sqlite+aiosqlite:///$APP_DIR/reward.db
 UPLOAD_DIR=$APP_DIR/backend/uploads
 CORS_ORIGINS=http://$SERVER_NAME
 OPENAI_API_KEY=
-AI_CONFIG_ENCRYPTION_KEY=
+AI_CONFIG_ENCRYPTION_KEY=$AI_CONFIG_ENCRYPTION_KEY
 SECRET_KEY=$SECRET_KEY
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 JWT_ALGORITHM=HS256
