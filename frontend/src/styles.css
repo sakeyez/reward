@@ -1288,6 +1288,7 @@ h3 {
 
 .learning-upload.has-preview {
   min-height: 180px;
+  padding: 10px;
   border-style: solid;
   border-color: #e3e2e2;
 }
@@ -1297,6 +1298,45 @@ h3 {
   height: 100%;
   min-height: 180px;
   object-fit: cover;
+}
+
+.upload-preview-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.upload-preview-grid img,
+.upload-add-tile {
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 0;
+  border-radius: 12px;
+}
+
+.upload-preview-grid img {
+  object-fit: cover;
+}
+
+.upload-add-tile {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px dashed #e4beb4;
+  background: #fff8f3;
+  color: #8b4a34;
+}
+
+.upload-add-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.upload-add-tile small {
+  font-size: 12px;
+  font-weight: 720;
 }
 
 .ai-toggle-row {

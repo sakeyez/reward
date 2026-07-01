@@ -158,19 +158,37 @@ def _build_user_content(checkin: Checkin) -> list[dict[str, Any]]:
             ),
         },
     ]
-    for label, image_url in [("学习笔记图片", checkin.note_image_url or checkin.image_url), ("做题记录图片", checkin.exercise_image_url)]:
-        data_url = _image_url_to_data_url(image_url)
-        if data_url:
-            content.append({"type": "text", "text": label})
-            content.append({"type": "image_url", "image_url": {"url": data_url}})
+    for label, image_urls in [
+        ("学习笔记图片", _checkin_image_urls(checkin.note_image_urls, checkin.note_image_url or checkin.image_url)),
+        ("做题记录图片", _checkin_image_urls(checkin.exercise_image_urls, checkin.exercise_image_url)),
+    ]:
+        for index, image_url in enumerate(image_urls, start=1):
+            data_url = _image_url_to_data_url(image_url)
+            if data_url:
+                content.append({"type": "text", "text": f"{label} {index}"})
+                content.append({"type": "image_url", "image_url": {"url": data_url}})
     return content
+
+
+def _checkin_image_urls(raw_urls: str | None, fallback_url: str | None) -> list[str]:
+    urls: list[str] = []
+    if raw_urls:
+        try:
+            parsed = json.loads(raw_urls)
+            if isinstance(parsed, list):
+                urls.extend(item for item in parsed if isinstance(item, str) and item)
+        except json.JSONDecodeError:
+            pass
+    if fallback_url and fallback_url not in urls:
+        urls.insert(0, fallback_url)
+    return urls
 
 
 def _image_url_to_data_url(image_url: str | None) -> str | None:
     if not image_url or not image_url.startswith("/uploads/"):
         return None
     settings = get_settings()
-    relative_path = image_url.removeprefix("/uploads/").replace("/", "\\")
+    relative_path = image_url.removeprefix("/uploads/")
     path = Path(settings.upload_dir) / relative_path
     if not path.exists() or not path.is_file():
         return None

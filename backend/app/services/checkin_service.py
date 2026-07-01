@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
@@ -22,14 +23,14 @@ async def create_checkin(
     user: User,
     content_text: str | None,
     image: UploadFile | None,
-    note_image: UploadFile | None,
-    exercise_image: UploadFile | None,
+    note_images: list[UploadFile],
+    exercise_images: list[UploadFile],
     checkin_date: date,
     study_time_minutes: int,
     question_count: int,
 ) -> Checkin:
     normalized_text = content_text.strip() if content_text else None
-    if not normalized_text and image is None and note_image is None and exercise_image is None:
+    if not normalized_text and image is None and not note_images and not exercise_images:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="content_text or image is required",
@@ -48,16 +49,20 @@ async def create_checkin(
         )
 
     image_url = await save_checkin_image(user.id, image, "legacy") if image else None
-    note_image_url = await save_checkin_image(user.id, note_image, "notes") if note_image else None
-    exercise_image_url = await save_checkin_image(user.id, exercise_image, "exercises") if exercise_image else None
+    note_image_urls = [await save_checkin_image(user.id, note_image, "notes") for note_image in note_images]
+    exercise_image_urls = [
+        await save_checkin_image(user.id, exercise_image, "exercises") for exercise_image in exercise_images
+    ]
 
     checkin = Checkin(
         user_id=user.id,
         checkin_date=checkin_date,
         content_text=normalized_text,
         image_url=image_url,
-        note_image_url=note_image_url,
-        exercise_image_url=exercise_image_url,
+        note_image_url=note_image_urls[0] if note_image_urls else None,
+        exercise_image_url=exercise_image_urls[0] if exercise_image_urls else None,
+        note_image_urls=json.dumps(note_image_urls) if note_image_urls else None,
+        exercise_image_urls=json.dumps(exercise_image_urls) if exercise_image_urls else None,
         study_time_minutes=study_time_minutes,
         question_count=question_count,
         status=CheckinStatus.analyzing,

@@ -61,6 +61,8 @@ export interface Checkin {
   image_url: string | null;
   note_image_url: string | null;
   exercise_image_url: string | null;
+  note_images: string[];
+  exercise_images: string[];
   study_time_minutes: number;
   question_count: number;
   note_words: number;

@@ -29,6 +29,8 @@ class Checkin(IdMixin, TimestampMixin, Base):
     image_url: Mapped[str | None] = mapped_column(String(500))
     note_image_url: Mapped[str | None] = mapped_column(String(500))
     exercise_image_url: Mapped[str | None] = mapped_column(String(500))
+    note_image_urls: Mapped[str | None] = mapped_column(Text)
+    exercise_image_urls: Mapped[str | None] = mapped_column(Text)
     study_time_minutes: Mapped[int] = mapped_column(default=0, nullable=False)
     question_count: Mapped[int] = mapped_column(default=0, nullable=False)
     note_words: Mapped[int] = mapped_column(default=0, nullable=False)

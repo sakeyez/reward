@@ -277,8 +277,8 @@ function App() {
     details?: {
       studyTimeMinutes: number;
       questionCount: number;
-      noteImageFile: File | null;
-      exerciseImageFile: File | null;
+      noteImageFiles: File[];
+      exerciseImageFiles: File[];
     }
   ) {
     if (!token) return;
@@ -291,8 +291,8 @@ function App() {
       if (details) {
         form.set("study_time_minutes", String(details.studyTimeMinutes));
         form.set("question_count", String(details.questionCount));
-        if (details.noteImageFile) form.set("note_image", details.noteImageFile);
-        if (details.exerciseImageFile) form.set("exercise_image", details.exerciseImageFile);
+        details.noteImageFiles.forEach((file) => form.append("note_image", file));
+        details.exerciseImageFiles.forEach((file) => form.append("exercise_image", file));
       }
       const created = await api.createCheckin(token, form);
       setLatestCheckin(created);
@@ -591,8 +591,8 @@ function CheckinPage({
     details?: {
       studyTimeMinutes: number;
       questionCount: number;
-      noteImageFile: File | null;
-      exerciseImageFile: File | null;
+      noteImageFiles: File[];
+      exerciseImageFiles: File[];
     }
   ) => Promise<void>;
   setRoute: (route: RouteName) => void;
@@ -602,22 +602,23 @@ function CheckinPage({
   const [studyHours, setStudyHours] = useState(2);
   const [questionCount, setQuestionCount] = useState("");
   const [aiEnabled, setAiEnabled] = useState(true);
-  const [noteImageFile, setNoteImageFile] = useState<File | null>(null);
-  const [exerciseImageFile, setExerciseImageFile] = useState<File | null>(null);
-  const [notePreview, setNotePreview] = useState("");
-  const [exercisePreview, setExercisePreview] = useState("");
+  const [noteImageFiles, setNoteImageFiles] = useState<File[]>([]);
+  const [exerciseImageFiles, setExerciseImageFiles] = useState<File[]>([]);
+  const [notePreviews, setNotePreviews] = useState<string[]>([]);
+  const [exercisePreviews, setExercisePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  function chooseFile(file: File | undefined, kind: "note" | "exercise") {
-    if (!file) return;
-    const nextPreview = URL.createObjectURL(file);
+  function chooseFiles(fileList: FileList | null, kind: "note" | "exercise") {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+    const nextPreviews = files.map((file) => URL.createObjectURL(file));
     if (kind === "note") {
-      setNoteImageFile(file);
-      setNotePreview(nextPreview);
+      setNoteImageFiles((current) => [...current, ...files]);
+      setNotePreviews((current) => [...current, ...nextPreviews]);
       return;
     }
-    setExerciseImageFile(file);
-    setExercisePreview(nextPreview);
+    setExerciseImageFiles((current) => [...current, ...files]);
+    setExercisePreviews((current) => [...current, ...nextPreviews]);
   }
 
   async function submit() {
@@ -626,23 +627,25 @@ function CheckinPage({
       questionCount.trim() ? `做题总数：${questionCount.trim()}` : "",
       aiEnabled ? "AI 判题：开启" : "AI 判题：关闭"
     ].filter(Boolean).join("\n");
-    const imageFile = exerciseImageFile ?? noteImageFile;
-    if (!content.trim() && !imageFile) {
+    const hasImages = noteImageFiles.length > 0 || exerciseImageFiles.length > 0;
+    if (!content.trim() && !hasImages) {
       return;
     }
     setSubmitting(true);
     try {
-      await onSubmit(content, imageFile, {
+      await onSubmit(content, null, {
         studyTimeMinutes: studyHours * 60,
         questionCount: Number(questionCount.trim() || 0),
-        noteImageFile,
-        exerciseImageFile
+        noteImageFiles,
+        exerciseImageFiles
       });
       setQuestionCount("");
-      setNoteImageFile(null);
-      setExerciseImageFile(null);
-      setNotePreview("");
-      setExercisePreview("");
+      setNoteImageFiles([]);
+      setExerciseImageFiles([]);
+      notePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+      exercisePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+      setNotePreviews([]);
+      setExercisePreviews([]);
     } finally {
       setSubmitting(false);
     }
@@ -699,16 +702,16 @@ function CheckinPage({
           <span className="learning-section-icon"><NoteGlyph /></span>
           <h2>学习笔记</h2>
         </div>
-        <label className={`learning-upload ${notePreview ? "has-preview" : ""}`}>
-          {notePreview ? (
-            <img src={notePreview} alt="学习笔记预览" />
+        <label className={`learning-upload ${notePreviews.length ? "has-preview" : ""}`}>
+          {notePreviews.length ? (
+            <ImagePreviewGrid previews={notePreviews} label="学习笔记预览" />
           ) : (
             <>
               <CameraPlusGlyph />
               <span>添加学习图片</span>
             </>
           )}
-          <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0], "note")} />
+          <input className="file-input" type="file" accept="image/*" multiple onChange={(event) => chooseFiles(event.target.files, "note")} />
         </label>
       </article>
 
@@ -744,26 +747,40 @@ function CheckinPage({
             <p>提交后将自动为您计算正确率及解析</p>
           </div>
         </div>
-        <label className={`learning-upload exercise-upload ${exercisePreview ? "has-preview" : ""}`}>
-          {exercisePreview ? (
-            <img src={exercisePreview} alt="题目照片预览" />
+        <label className={`learning-upload exercise-upload ${exercisePreviews.length ? "has-preview" : ""}`}>
+          {exercisePreviews.length ? (
+            <ImagePreviewGrid previews={exercisePreviews} label="题目照片预览" />
           ) : (
             <>
               <CameraPlusGlyph />
               <span>上传题目照片</span>
             </>
           )}
-          <input className="file-input" type="file" accept="image/*" capture="environment" onChange={(event) => chooseFile(event.target.files?.[0], "exercise")} />
+          <input className="file-input" type="file" accept="image/*" capture="environment" multiple onChange={(event) => chooseFiles(event.target.files, "exercise")} />
         </label>
       </article>
 
       {message && <p className="form-message">{message}</p>}
       <div className="learning-submit-wrap">
-        <button className="primary-btn" onClick={submit} disabled={submitting || (!questionCount.trim() && !noteImageFile && !exerciseImageFile)}>
+        <button className="primary-btn" onClick={submit} disabled={submitting || (!questionCount.trim() && noteImageFiles.length === 0 && exerciseImageFiles.length === 0)}>
           {submitting ? "正在提交..." : "提交学习记录"}
         </button>
       </div>
     </section>
+  );
+}
+
+function ImagePreviewGrid({ previews, label }: { previews: string[]; label: string }) {
+  return (
+    <div className="upload-preview-grid">
+      {previews.map((preview, index) => (
+        <img src={preview} alt={`${label} ${index + 1}`} key={preview} />
+      ))}
+      <span className="upload-add-tile">
+        <CameraPlusGlyph />
+        <small>继续添加</small>
+      </span>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ from backend.app.main import app
 from backend.app.models.reward import Reward, RewardStatus
 from backend.app.models.user import User
 from backend.app.services.ai_scoring_service import AiScorePayload, AiScoreResult
+from backend.app.services.ai_scoring_service import _build_user_content
 from backend.app.services.checkin_service import analyze_checkin
 from backend.app.services.reward_formula_service import RewardFormulaInput, calculate_reward
 
@@ -195,3 +196,77 @@ def test_user_can_update_profile(client: TestClient) -> None:
     body = update.json()
     assert body["display_name"] == "After"
     assert body["avatar_url"].startswith("/uploads/avatars/")
+
+
+def test_user_can_submit_multiple_note_and_exercise_images(client: TestClient) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "multi_image_user",
+            "password": "password123",
+            "display_name": "Multi Image",
+        },
+    )
+    assert register.status_code == 201
+    token = register.json()["access_token"]
+
+    checkin = client.post(
+        "/api/checkins",
+        data={
+            "checkin_date": "2026-07-01",
+            "study_time_minutes": "30",
+            "question_count": "5",
+        },
+        files=[
+            ("note_image", ("note-1.png", b"fake-note-1", "image/png")),
+            ("note_image", ("note-2.png", b"fake-note-2", "image/png")),
+            ("exercise_image", ("exercise-1.png", b"fake-exercise-1", "image/png")),
+            ("exercise_image", ("exercise-2.png", b"fake-exercise-2", "image/png")),
+        ],
+        headers=auth_headers(token),
+    )
+    assert checkin.status_code == 201
+    body = checkin.json()
+    assert len(body["note_images"]) == 2
+    assert len(body["exercise_images"]) == 2
+    assert body["note_image_url"] == body["note_images"][0]
+    assert body["exercise_image_url"] == body["exercise_images"][0]
+
+
+def test_ai_content_includes_note_only_image(client: TestClient) -> None:
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "note_only_user",
+            "password": "password123",
+            "display_name": "Note Only",
+        },
+    )
+    assert register.status_code == 201
+    token = register.json()["access_token"]
+
+    checkin = client.post(
+        "/api/checkins",
+        data={
+            "checkin_date": "2026-07-02",
+            "study_time_minutes": "30",
+        },
+        files=[("note_image", ("note.png", b"fake-note", "image/png"))],
+        headers=auth_headers(token),
+    )
+    assert checkin.status_code == 201
+
+    import asyncio
+
+    async def build_content() -> list[dict]:
+        async for session in client.app.dependency_overrides[get_db_session]():
+            from backend.app.services.checkin_service import get_user_checkin_by_id
+
+            checkin_model = await get_user_checkin_by_id(session, 1, checkin.json()["id"])
+            return _build_user_content(checkin_model)
+        raise AssertionError("session unavailable")
+
+    content = asyncio.run(build_content())
+    text_items = [item["text"] for item in content if item["type"] == "text"]
+    assert "学习笔记图片 1" in text_items
+    assert any(item["type"] == "image_url" for item in content)
