@@ -39,6 +39,13 @@ export class ApiError extends Error {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+const BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+export function assetUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (!url.startsWith("/")) return url;
+  return `${BASE_PATH}${url}`;
+}
 
 function formatApiError(detail: unknown): string {
   if (typeof detail === "string") return detail;

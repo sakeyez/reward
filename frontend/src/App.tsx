@@ -23,7 +23,7 @@ import {
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import dogecoinIcon from "./assets/dogecoin.png";
 import studyDogImage from "./assets/study-dog-card.jpg";
-import { api, ApiError } from "./lib/api";
+import { api, ApiError, assetUrl } from "./lib/api";
 import type {
   Checkin,
   CheckinCalendarItem,
@@ -1108,7 +1108,7 @@ function ShopPage({
             aria-label={`${reward.name}，需要 ${reward.cost_points} 狗狗币`}
           >
             {reward.image_url ? (
-              <img className="product-image" src={reward.image_url} alt={reward.name} />
+              <img className="product-image" src={assetUrl(reward.image_url)} alt={reward.name} />
             ) : (
               <div className={`product-art ${artByCategory[reward.category] ?? "stationery"}`} role="img" aria-label={`${reward.name} 商品图`} />
             )}
@@ -1221,7 +1221,7 @@ function ProfilePage({
 function Avatar({ user, large = false }: { user: UserType; large?: boolean }) {
   return (
     <div className={`avatar ${large ? "large" : ""}`} role="img" aria-label="用户头像">
-      {user.avatar_url && <img src={user.avatar_url} alt="" />}
+      {user.avatar_url && <img src={assetUrl(user.avatar_url)} alt="" />}
     </div>
   );
 }
@@ -1298,7 +1298,7 @@ function SettingsSheet({
 }) {
   const [displayName, setDisplayName] = useState(user.display_name);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState(user.avatar_url ?? "");
+  const [preview, setPreview] = useState(assetUrl(user.avatar_url));
   const [saving, setSaving] = useState(false);
 
   function chooseAvatar(file: File | undefined) {
