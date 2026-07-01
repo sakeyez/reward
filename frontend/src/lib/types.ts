@@ -1,5 +1,16 @@
 export type UserStatus = "active" | "disabled";
 
+export interface LevelInfo {
+  code: string;
+  name: string;
+  label: string;
+  current_level_points: number;
+  next_level_points: number | null;
+  progress_percent: number;
+  points_to_next_level: number;
+  is_max_level: boolean;
+}
+
 export interface User {
   id: number;
   username: string | null;
@@ -9,6 +20,7 @@ export interface User {
   avatar_url: string | null;
   current_points: number;
   streak_days: number;
+  level?: LevelInfo;
   status: UserStatus;
   created_at: string;
 }

@@ -29,9 +29,11 @@ import type {
   CheckinCalendarItem,
   CheckinCalendarResponse,
   PointAccount,
+  PointTransaction,
   Redemption,
   Reward,
   RouteName,
+  LevelInfo,
   User as UserType
 } from "./lib/types";
 
@@ -135,6 +137,20 @@ function App() {
     setUser(nextUser);
   }, [token]);
 
+  const refreshProfile = useCallback(async (activeToken = token) => {
+    if (!activeToken) return;
+    const [nextUser, nextPoints, nextRedemptions, nextCheckins] = await Promise.all([
+      api.me(activeToken),
+      api.points(activeToken),
+      api.redemptions(activeToken),
+      api.listCheckins(activeToken)
+    ]);
+    setUser(nextUser);
+    setPoints(nextPoints);
+    setRedemptions(nextRedemptions);
+    setCheckins(nextCheckins);
+  }, [token]);
+
   useEffect(() => {
     function syncToday() {
       const nextToday = new Date();
@@ -187,8 +203,12 @@ function App() {
       refreshShop(token).catch((error) => setMessage(readableError(error)));
       return;
     }
+    if (route === "profile") {
+      refreshProfile(token).catch((error) => setMessage(readableError(error)));
+      return;
+    }
     refreshDashboard(token).catch((error) => setMessage(readableError(error)));
-  }, [refreshDashboard, refreshShop, route, signedIn, todayIso, token]);
+  }, [refreshDashboard, refreshProfile, refreshShop, route, signedIn, todayIso, token]);
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
@@ -362,7 +382,6 @@ function App() {
           checkins={checkins}
           redemptions={redemptions}
           onSignOut={signOut}
-          onRefresh={refreshUser}
           onUpdateProfile={handleUpdateProfile}
           theme={theme}
           setTheme={setTheme}
@@ -1090,7 +1109,6 @@ function ProfilePage({
   checkins,
   redemptions,
   onSignOut,
-  onRefresh,
   onUpdateProfile,
   theme,
   setTheme,
@@ -1101,14 +1119,15 @@ function ProfilePage({
   checkins: Checkin[];
   redemptions: Redemption[];
   onSignOut: () => void;
-  onRefresh: () => Promise<void>;
   onUpdateProfile: (form: FormData) => Promise<void>;
   theme: "paper" | "focus";
   setTheme: (theme: "paper" | "focus") => void;
   setRoute: (route: RouteName) => void;
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailSheet, setDetailSheet] = useState<"redemptions" | "points" | null>(null);
   const badgeItems = getBadgeItems(user, checkins, redemptions);
+  const level = getUserLevel(user);
 
   return (
     <section className="page">
@@ -1120,7 +1139,7 @@ function ProfilePage({
           <div className="profile-row" style={{ gap: 12 }}>
             <Avatar user={user} large />
             <div>
-              <p className="eyebrow">{levelName(user.current_points)}</p>
+              <p className="eyebrow">{formatLevelCode(level)}</p>
               <h1>{user.display_name}</h1>
             </div>
           </div>
@@ -1128,12 +1147,15 @@ function ProfilePage({
         </div>
         <div className="level-card">
           <div className="sheet-row">
-            <strong>{levelName(user.current_points)}</strong>
-            <span style={{ color: "var(--muted)", fontSize: 13 }}>连续 {user.streak_days} 天</span>
+            <strong>{formatLevelCode(level)}</strong>
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>
+              {level.is_max_level ? "已满级" : `还差 ${level.points_to_next_level} 狗狗币`}
+            </span>
           </div>
           <div className="progress-track" style={{ marginTop: 10 }}>
-            <div className="progress-fill" style={{ width: `${Math.min((user.current_points % 1000) / 10, 100)}%` }} />
+            <div className="progress-fill" style={{ width: `${level.progress_percent}%` }} />
           </div>
+          <p className="level-streak">连续 {user.streak_days} 天</p>
         </div>
       </article>
       <button className="section-link profile-section-title" onClick={() => setRoute("badges")}>
@@ -1147,11 +1169,18 @@ function ProfilePage({
       </div>
       <h2 className="section-title profile-section-title account-title">账户</h2>
       <div className="entry-list">
-        <Entry label={`兑换记录 ${redemptions.length}`} />
-        <Entry label={`狗狗币流水 ${points?.transactions.length ?? 0}`} />
-        <button className="list-item" onClick={() => onRefresh()}><span>刷新资料</span><ChevronRight /></button>
+        <Entry label={`兑换记录 ${redemptions.length}`} onClick={() => setDetailSheet("redemptions")} />
+        <Entry label={`狗狗币流水 ${points?.transactions.length ?? 0}`} onClick={() => setDetailSheet("points")} />
         <button className="list-item danger-entry" onClick={onSignOut}><span>退出登录</span><LogOut /></button>
       </div>
+      {detailSheet && (
+        <ProfileDetailSheet
+          kind={detailSheet}
+          redemptions={redemptions}
+          transactions={points?.transactions ?? []}
+          onClose={() => setDetailSheet(null)}
+        />
+      )}
       {settingsOpen && (
         <SettingsSheet
           user={user}
@@ -1169,6 +1198,63 @@ function Avatar({ user, large = false }: { user: UserType; large?: boolean }) {
   return (
     <div className={`avatar ${large ? "large" : ""}`} role="img" aria-label="用户头像">
       {user.avatar_url && <img src={user.avatar_url} alt="" />}
+    </div>
+  );
+}
+
+function ProfileDetailSheet({
+  kind,
+  redemptions,
+  transactions,
+  onClose
+}: {
+  kind: "redemptions" | "points";
+  redemptions: Redemption[];
+  transactions: PointTransaction[];
+  onClose: () => void;
+}) {
+  const title = kind === "redemptions" ? "兑换记录" : "狗狗币流水";
+  const emptyText = kind === "redemptions" ? "还没有兑换记录" : "还没有狗狗币流水";
+
+  return (
+    <div className="modal-scrim" onClick={onClose} role="presentation">
+      <section className="profile-detail-sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+        <div className="sheet-row">
+          <h2 style={{ margin: 0 }}>{title}</h2>
+          <button className="sheet-close" onClick={onClose} aria-label="关闭"><X /></button>
+        </div>
+        {kind === "redemptions" ? (
+          redemptions.length ? (
+            <div className="detail-list">
+              {redemptions.map((item) => (
+                <article className="detail-record" key={item.id}>
+                  <div>
+                    <strong>{item.reward_name}</strong>
+                    <span>{formatRedemptionStatus(item.status)} · {formatDateTime(item.created_at)}</span>
+                  </div>
+                  <em>-{item.cost_points}</em>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-copy">{emptyText}</p>
+          )
+        ) : transactions.length ? (
+          <div className="detail-list">
+            {transactions.map((item) => (
+              <article className="detail-record" key={item.id}>
+                <div>
+                  <strong>{item.reason || formatTransactionType(item.type)}</strong>
+                  <span>{formatTransactionType(item.type)} · 余额 {item.balance_after} · {formatDateTime(item.created_at)}</span>
+                </div>
+                <em className={item.amount >= 0 ? "positive" : "negative"}>{formatSignedAmount(item.amount)}</em>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-copy">{emptyText}</p>
+        )}
+      </section>
     </div>
   );
 }
@@ -1607,8 +1693,8 @@ function Badge({ label, icon, locked = false }: { label: string; icon: React.Rea
   );
 }
 
-function Entry({ label }: { label: string }) {
-  return <button className="list-item"><span>{label}</span><ChevronRight /></button>;
+function Entry({ label, onClick }: { label: string; onClick?: () => void }) {
+  return <button className="list-item" onClick={onClick}><span>{label}</span><ChevronRight /></button>;
 }
 
 function readableError(error: unknown): string {
@@ -1661,6 +1747,83 @@ function formatMonthDay(date: Date): string {
   }).format(date);
 }
 
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatSignedAmount(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function formatTransactionType(type: PointTransaction["type"]): string {
+  const labels: Record<PointTransaction["type"], string> = {
+    checkin_reward: "打卡奖励",
+    redemption_cost: "兑换消耗",
+    admin_adjustment: "管理员调整",
+    refund: "退款"
+  };
+  return labels[type];
+}
+
+function formatRedemptionStatus(status: Redemption["status"]): string {
+  const labels: Record<Redemption["status"], string> = {
+    created: "已创建",
+    fulfilled: "已完成",
+    cancelled: "已取消",
+    refunded: "已退款"
+  };
+  return labels[status];
+}
+
+function formatLevelCode(level: LevelInfo): string {
+  return `Lv.${level.code.replace("lv", "")}`;
+}
+
+function getUserLevel(user: UserType): LevelInfo {
+  if (user.level) return user.level;
+
+  const levels = [
+    { threshold: 0, code: "lv2", name: "起步认真" },
+    { threshold: 300, code: "lv3", name: "稳定进步" },
+    { threshold: 800, code: "lv4", name: "学习能量" },
+    { threshold: 1500, code: "lv5", name: "坚持达人" },
+    { threshold: 3000, code: "lv6", name: "复盘高手" }
+  ];
+  const points = Math.max(0, user.current_points);
+  const currentIndex = levels.reduce((match, item, index) => points >= item.threshold ? index : match, 0);
+  const current = levels[currentIndex];
+  const next = levels[currentIndex + 1];
+  const levelNumber = current.code.replace("lv", "");
+  if (!next) {
+    return {
+      code: current.code,
+      name: current.name,
+      label: `Lv.${levelNumber} ${current.name}`,
+      current_level_points: current.threshold,
+      next_level_points: null,
+      progress_percent: 100,
+      points_to_next_level: 0,
+      is_max_level: true
+    };
+  }
+  const span = Math.max(1, next.threshold - current.threshold);
+  return {
+    code: current.code,
+    name: current.name,
+    label: `Lv.${levelNumber} ${current.name}`,
+    current_level_points: current.threshold,
+    next_level_points: next.threshold,
+    progress_percent: Math.max(0, Math.min(100, Math.round((points - current.threshold) / span * 100))),
+    points_to_next_level: Math.max(next.threshold - points, 0),
+    is_max_level: false
+  };
+}
+
 function average(values: number[]): number {
   const filtered = values.filter((value) => value > 0);
   if (!filtered.length) return 0;
@@ -1678,14 +1841,6 @@ function calculateDisplayReward(checkin: Checkin): number {
     return checkin.awarded_points;
   }
   return 0;
-}
-
-function levelName(points: number): string {
-  if (points >= 3000) return "Lv.6 复盘高手";
-  if (points >= 1500) return "Lv.5 坚持达人";
-  if (points >= 800) return "Lv.4 学习能量";
-  if (points >= 300) return "Lv.3 稳定进步";
-  return "Lv.2 起步认真";
 }
 
 export default App;

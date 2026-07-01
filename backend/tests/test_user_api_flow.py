@@ -86,7 +86,13 @@ def test_user_checkin_points_and_redemption_flow(client: TestClient, monkeypatch
         },
     )
     assert register.status_code == 201
-    token = register.json()["access_token"]
+    register_body = register.json()
+    token = register_body["access_token"]
+    assert register_body["user"]["level"]["label"] == "Lv.2 起步认真"
+
+    me = client.get("/api/users/me", headers=auth_headers(token))
+    assert me.status_code == 200
+    assert me.json()["level"]["code"] == "lv2"
 
     checkin = client.post(
         "/api/checkins",

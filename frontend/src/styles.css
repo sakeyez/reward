@@ -3177,7 +3177,8 @@ label.composer-mic {
   animation: slideUp 220ms ease both;
 }
 
-.settings-sheet {
+.settings-sheet,
+.profile-detail-sheet {
   width: min(100vw, 430px);
   padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
   border-radius: 26px 26px 0 0;
@@ -3185,6 +3186,66 @@ label.composer-mic {
   box-shadow: 0 -16px 40px rgba(29, 29, 31, 0.16);
   backdrop-filter: blur(22px);
   animation: slideUp 220ms ease both;
+}
+
+.profile-detail-sheet {
+  max-height: min(72dvh, 620px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.detail-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+
+.detail-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--wash);
+}
+
+.detail-record strong,
+.detail-record span {
+  display: block;
+}
+
+.detail-record strong {
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.detail-record span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 680;
+}
+
+.detail-record em {
+  color: #a43d12;
+  font-style: normal;
+  font-size: 18px;
+  font-weight: 860;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-record em.positive {
+  color: var(--success);
+}
+
+.detail-record em.negative {
+  color: #a43d12;
 }
 
 .settings-form {
@@ -3345,6 +3406,13 @@ label.composer-mic {
   padding: 14px;
   border-radius: 20px;
   background: #fff;
+}
+
+.level-streak {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 720;
 }
 
 .progress-track {
