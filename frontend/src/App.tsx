@@ -488,22 +488,22 @@ function AuthPage({
           <>
             <label>
               昵称
-              <input name="display_name" minLength={1} maxLength={80} placeholder="林小然" required />
+              <input name="display_name" minLength={1} maxLength={80} required />
             </label>
             <label>
               用户名
-              <input name="username" minLength={3} maxLength={64} placeholder="study_user" required />
+              <input name="username" minLength={3} maxLength={64} required />
             </label>
           </>
         ) : (
           <label>
             用户名
-            <input name="identifier" placeholder="study_user" required />
+            <input name="identifier" required />
           </label>
         )}
         <label>
           密码
-          <input name="password" type="password" minLength={8} maxLength={128} placeholder="至少 8 位" required />
+          <input name="password" type="password" minLength={8} maxLength={128} required />
         </label>
         {message && <p className="form-message">{message}</p>}
         <button className="primary-btn" type="submit" disabled={submitting}>
