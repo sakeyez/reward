@@ -12,6 +12,10 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     upload_dir: Path = Field(default=Path("backend/uploads"), alias="UPLOAD_DIR")
+    cors_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173",
+        alias="CORS_ORIGINS",
+    )
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     ai_config_encryption_key: str = Field(default="", alias="AI_CONFIG_ENCRYPTION_KEY")
     secret_key: str = Field(default="change-me-in-production", alias="SECRET_KEY")
