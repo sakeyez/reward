@@ -1,5 +1,4 @@
 import {
-  Bell,
   BookOpen,
   Calendar,
   Camera,
@@ -11,9 +10,10 @@ import {
   Home,
   Image,
   LogOut,
+  Bell,
+  CheckCircle2,
   MoreVertical,
   Plus,
-  Send,
   Settings,
   Sparkles,
   Trophy,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import dogecoinIcon from "./assets/dogecoin.png";
+import studyDogImage from "./assets/study-dog-card.jpg";
 import { api, ApiError } from "./lib/api";
 import type {
   Checkin,
@@ -37,11 +38,6 @@ import type {
 const TOKEN_KEY = "reward_access_token";
 const THEME_KEY = "reward_theme";
 const SAVINGS_GOAL_KEY = "reward_savings_goal_v2";
-
-const today = new Date();
-const currentYear = today.getFullYear();
-const currentMonth = today.getMonth() + 1;
-const todayIso = formatDateInput(today);
 
 const artByCategory: Record<string, string> = {
   "文具": "stationery",
@@ -60,13 +56,14 @@ function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<UserType | null>(null);
   const [route, setRoute] = useState<RouteName>("home");
+  const [today, setToday] = useState(() => new Date());
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [latestCheckin, setLatestCheckin] = useState<Checkin | null>(null);
   const [points, setPoints] = useState<PointAccount | null>(null);
   const [calendar, setCalendar] = useState<CheckinCalendarResponse | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
-  const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
   const [activeCategory, setActiveCategory] = useState("全部");
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [savingsGoal, setSavingsGoal] = useState<SavingsGoal | null>(() => readSavingsGoal());
@@ -78,6 +75,9 @@ function App() {
   });
 
   const signedIn = Boolean(token && user);
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const todayIso = formatDateInput(today);
 
   const applySession = useCallback((nextToken: string, nextUser: UserType) => {
     localStorage.setItem(TOKEN_KEY, nextToken);
@@ -119,7 +119,7 @@ function App() {
     setCalendar(nextCalendar);
     setCheckins(nextCheckins);
     setLatestCheckin(nextCheckins[0] ?? null);
-  }, [token]);
+  }, [currentMonth, currentYear, token]);
 
   const refreshShop = useCallback(async (activeToken = token) => {
     if (!activeToken) return;
@@ -134,6 +134,28 @@ function App() {
     setPoints(nextPoints);
     setUser(nextUser);
   }, [token]);
+
+  useEffect(() => {
+    function syncToday() {
+      const nextToday = new Date();
+      setToday((currentToday) => (
+        formatDateInput(currentToday) === formatDateInput(nextToday) ? currentToday : nextToday
+      ));
+    }
+
+    const timer = window.setInterval(syncToday, 60 * 1000);
+    window.addEventListener("focus", syncToday);
+    document.addEventListener("visibilitychange", syncToday);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", syncToday);
+      document.removeEventListener("visibilitychange", syncToday);
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedDay(today.getDate());
+  }, [todayIso]);
 
   useEffect(() => {
     let mounted = true;
@@ -166,7 +188,7 @@ function App() {
       return;
     }
     refreshDashboard(token).catch((error) => setMessage(readableError(error)));
-  }, [refreshDashboard, refreshShop, route, signedIn, token]);
+  }, [refreshDashboard, refreshShop, route, signedIn, todayIso, token]);
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme);
@@ -282,14 +304,16 @@ function App() {
       {route === "home" && (
         <HomePage
           user={user}
-          points={points}
           latestCheckin={latestCheckin}
+          today={today}
+          todayIso={todayIso}
           setRoute={setRoute}
         />
       )}
       {route === "checkin" && (
         <CheckinPage
           latestCheckin={latestCheckin}
+          todayIso={todayIso}
           onSubmit={handleSubmitCheckin}
           setRoute={setRoute}
           message={message}
@@ -308,6 +332,8 @@ function App() {
           records={calendarRecords}
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
+          currentYear={currentYear}
+          currentMonth={currentMonth}
           user={user}
         />
       )}
@@ -447,83 +473,75 @@ function AuthPage({
 
 function HomePage({
   user,
-  points,
   latestCheckin,
+  today,
+  todayIso,
   setRoute
 }: {
   user: UserType;
-  points: PointAccount | null;
   latestCheckin: Checkin | null;
+  today: Date;
+  todayIso: string;
   setRoute: (route: RouteName) => void;
 }) {
   const completedToday = latestCheckin?.checkin_date === todayIso;
-  const score = latestCheckin?.total_score ?? 0;
-  const monthPoints = points?.transactions
-    .filter((item) => item.type === "checkin_reward")
-    .reduce((sum, item) => sum + item.amount, 0) ?? 0;
+  const firstName = user.display_name.trim().slice(0, 1) || "同学";
 
   return (
-    <section className="page">
-      <header className="home-hero">
-        <div>
-          <h1>早上好，<br />{user.display_name}</h1>
-          <p className="date-pill">{formatReadableDate(today)}</p>
+    <section className="page home-page">
+      <header className="home-topbar">
+        <div className="home-greeting">
+          <Avatar user={user} />
+          <h1>早上好，{firstName}！</h1>
         </div>
-        <button className="plain-icon" aria-label="通知"><Bell /></button>
+        <button className="home-alert" aria-label="通知">
+          <Bell />
+        </button>
       </header>
-      <div className="section-row">
-        <h2 className="section-title">学习计划</h2>
-        <button className="plain-icon small" aria-label="设置"><Settings /></button>
-      </div>
-      <article className="plan-card">
-        <div className="plan-media paper-preview" role="img" aria-label="学习成果示意图" />
+      <p className="date-pill"><Calendar /> {formatReadableDate(today)}</p>
+      <article className="plan-card home-checkin-card">
+        <img className="plan-media study-dog-preview" src={studyDogImage} alt="学习陪伴狗狗" />
         <div className="plan-copy">
-          <p><strong>{user.display_name}</strong> 正在复盘</p>
-          <h3>AI 学习打卡</h3>
-          <div className="rule" />
-          <p>上传今天的学习成果，收下成长分。</p>
-        </div>
-        <div className="plan-foot">
-          <span><Calendar /> {formatMonthDay(today)}</span>
-          <strong>{completedToday ? "已完成" : "待打卡"}</strong>
-          <button className="chat-link" onClick={() => setRoute("checkin")} aria-label="进入打卡"><Send /></button>
-        </div>
-      </article>
-      <article className="card task-card compact">
-        <div className="task-layout">
-          <div>
-            <p className="eyebrow">今日学习小任务</p>
-            <div className="goal">上传学习成果，收下今天的成长分</div>
-            <div className="status-line">
-              <span className="status-chip">最高 <DogecoinAmount value="+100" compact /></span>
-              <span className="status-chip">{completedToday ? "已完成" : "待打卡"}</span>
-            </div>
+          <h3>学习打卡</h3>
+          <p>上传今天的学习成果，收获成长分。</p>
+          <div className="plan-actions">
+            <span>{formatMonthDay(today)}</span>
+            <button onClick={() => setRoute("checkin")}>
+              {completedToday ? "已完成" : "待打卡"}
+            </button>
           </div>
-          {completedToday && <EnergyRing value={score} label="能量" />}
         </div>
       </article>
-      <h2 className="section-title">本周学习表现</h2>
-      <div className="metrics-grid">
+      <button className="section-link home-section-link" onClick={() => setRoute("calendar")}>
+        <h2>本周学习表现</h2>
+        <ChevronRight />
+      </button>
+      <div className="metrics-grid home-metrics-grid">
         <Metric label="最近得分" value={latestCheckin?.total_score?.toString() ?? "--"} />
-        <Metric label="累计狗狗币" value={String(user.current_points)} />
-        <Metric label="连续打卡" value={String(user.streak_days)} />
+        <Metric label="狗狗币" value={String(user.current_points)} />
+        <Metric label="连续打卡" value={String(user.streak_days)} icon={<Flame />} accent />
       </div>
-      <article className="card task-card compact history-card">
-        <p className="eyebrow">狗狗币流水</p>
-        <h3>{monthPoints > 0 ? <DogecoinAmount value={`+${monthPoints}`} /> : "还没有狗狗币记录"}</h3>
-        <p>{points?.transactions[0]?.reason.replaceAll("积分", "狗狗币") ?? "完成一次打卡后，这里会出现你的狗狗币变化。"}</p>
-      </article>
+      <button className="new-plan-card" onClick={() => setRoute("checkin")}>
+        <span><CheckCircle2 /></span>
+        <strong>开启新的学习计划</strong>
+        <small>定制专属你的狗狗陪伴式学习体验</small>
+      </button>
+      <button className="home-fab" onClick={() => setRoute("checkin")} aria-label="新增学习计划">
+        <Plus />
+      </button>
     </section>
   );
 }
 
 function CheckinPage({
   latestCheckin,
+  todayIso,
   onSubmit,
   setRoute,
   message
 }: {
   latestCheckin: Checkin | null;
+  todayIso: string;
   onSubmit: (
     contentText: string,
     imageFile: File | null,
@@ -780,12 +798,16 @@ function CalendarPage({
   records,
   selectedDay,
   setSelectedDay,
+  currentYear,
+  currentMonth,
   user
 }: {
   calendar: CheckinCalendarResponse | null;
   records: Record<number, CheckinCalendarItem>;
   selectedDay: number;
   setSelectedDay: (day: number) => void;
+  currentYear: number;
+  currentMonth: number;
   user: UserType;
 }) {
   const selected = records[selectedDay];
@@ -815,6 +837,7 @@ function CalendarPage({
             <CalendarCell
               key={day}
               day={day}
+              currentMonth={currentMonth}
               record={records[day]}
               selected={selectedDay === day}
               onClick={() => setSelectedDay(day)}
@@ -903,8 +926,7 @@ function SavingsGoalPage({
     <section className="page savings-page">
       <div className="title-row">
         <div>
-          <p className="eyebrow">奖励中心</p>
-          <h1>目标商城</h1>
+          <h1>目标</h1>
         </div>
         <span className="pill savings-balance-pill"><DogecoinAmount value={user.current_points} hideLabel /></span>
       </div>
@@ -1313,23 +1335,22 @@ function BottomNav({ route, setRoute }: { route: RouteName; setRoute: (route: Ro
   const items: Array<[RouteName, string, React.ReactNode]> = [
     ["home", "首页", <Home />],
     ["calendar", "日历", <Calendar />],
-    ["checkin", "打卡", <Plus />],
-    ["shopGoal", "商城", <PawIcon />],
+    ["shopGoal", "计划", <CheckCircle2 />],
     ["profile", "我的", <User />]
   ];
   const activeRoute = route === "badges" ? "profile" : route === "shop" ? "shopGoal" : route;
 
   return (
     <nav className="nav-bar" aria-label="底部导航">
-      {items.map(([itemRoute, label, icon], index) => (
+      {items.map(([itemRoute, label, icon]) => (
         <button
-          className={`nav-item ${itemRoute === "checkin" ? "compose" : ""} ${activeRoute === itemRoute ? "active" : ""}`}
+          className={`nav-item ${activeRoute === itemRoute ? "active" : ""}`}
           key={itemRoute}
           onClick={() => setRoute(itemRoute)}
           aria-label={label}
         >
           <span className="nav-icon">{icon}</span>
-          <span>{index === 2 ? "" : label}</span>
+          <span>{label}</span>
         </button>
       ))}
     </nav>
@@ -1448,11 +1469,13 @@ function GradeRing({ value, grade }: { value: number; grade: string }) {
 
 function CalendarCell({
   day,
+  currentMonth,
   record,
   selected,
   onClick
 }: {
   day: number;
+  currentMonth: number;
   record?: CheckinCalendarItem;
   selected: boolean;
   onClick: () => void;
@@ -1471,8 +1494,24 @@ function CalendarCell({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <article className="metric-card"><span>{label}</span><strong>{value}</strong></article>;
+function Metric({
+  label,
+  value,
+  icon,
+  accent = false
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <article className={`metric-card ${accent ? "accent" : ""}`}>
+      <span>{label}</span>
+      <strong>{icon}{value}</strong>
+      <i aria-hidden="true" />
+    </article>
+  );
 }
 
 function DogecoinAmount({
