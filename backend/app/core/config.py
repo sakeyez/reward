@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="change-me-in-production", alias="SECRET_KEY")
     access_token_expire_minutes: int = Field(default=60 * 24, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    sms_code_ttl_minutes: int = Field(default=5, alias="SMS_CODE_TTL_MINUTES")
+    sms_code_send_interval_seconds: int = Field(default=60, alias="SMS_CODE_SEND_INTERVAL_SECONDS")
+    sms_login_auto_register: bool = Field(default=True, alias="SMS_LOGIN_AUTO_REGISTER")
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -245,13 +245,21 @@ function App() {
     localStorage.removeItem(SAVINGS_GOAL_KEY);
   }, [savingsGoal]);
 
-  async function handleAuth(mode: "login" | "register", form: FormData) {
+  async function handleAuth(mode: "login" | "register" | "smsLogin", form: FormData) {
     try {
       setMessage("");
-      const password = String(form.get("password") ?? "");
       if (mode === "login") {
         const identifier = String(form.get("identifier") ?? "").trim();
+        const password = String(form.get("password") ?? "");
         const response = await api.login({ identifier, password });
+        applySession(response.access_token, response.user);
+        await refreshDashboard(response.access_token);
+        return;
+      }
+      if (mode === "smsLogin") {
+        const phone = String(form.get("phone") ?? "").trim();
+        const code = String(form.get("code") ?? "").trim();
+        const response = await api.smsLogin({ phone, code });
         applySession(response.access_token, response.user);
         await refreshDashboard(response.access_token);
         return;
@@ -259,6 +267,7 @@ function App() {
 
       const username = String(form.get("username") ?? "").trim();
       const displayName = String(form.get("display_name") ?? "").trim();
+      const password = String(form.get("password") ?? "");
       const response = await api.register({
         username,
         display_name: displayName,
@@ -327,6 +336,18 @@ function App() {
     }
   }
 
+  async function handleSendSmsCode(phone: string): Promise<number> {
+    try {
+      setMessage("");
+      const response = await api.sendSmsCode(phone);
+      setMessage(response.message);
+      return response.expires_in_seconds;
+    } catch (error) {
+      setMessage(readableError(error));
+      throw error;
+    }
+  }
+
   if (loading) {
     return <Shell><div className="empty-copy">正在连接学习记录...</div></Shell>;
   }
@@ -334,7 +355,7 @@ function App() {
   if (!signedIn || !user) {
     return (
       <Shell>
-        <AuthPage onSubmit={handleAuth} message={message} />
+        <AuthPage onSubmit={handleAuth} onSendSmsCode={handleSendSmsCode} message={message} />
       </Shell>
     );
   }
@@ -442,22 +463,44 @@ function Shell({ children, theme = "paper" }: { children: React.ReactNode; theme
 
 function AuthPage({
   onSubmit,
+  onSendSmsCode,
   message
 }: {
-  onSubmit: (mode: "login" | "register", form: FormData) => Promise<void>;
+  onSubmit: (mode: "login" | "register" | "smsLogin", form: FormData) => Promise<void>;
+  onSendSmsCode: (phone: string) => Promise<number>;
   message: string;
 }) {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [loginMethod, setLoginMethod] = useState<"password" | "sms">("password");
+  const [phone, setPhone] = useState("");
+  const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [sendingCode, setSendingCode] = useState(false);
   const [quote] = useState(() => authQuotes[Math.floor(Math.random() * authQuotes.length)]);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = window.setTimeout(() => setCountdown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [countdown]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
     try {
-      await onSubmit(mode, new FormData(event.currentTarget));
+      await onSubmit(mode === "login" && loginMethod === "sms" ? "smsLogin" : mode, new FormData(event.currentTarget));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function sendCode() {
+    setSendingCode(true);
+    try {
+      const expiresInSeconds = await onSendSmsCode(phone);
+      setCountdown(Math.min(expiresInSeconds, 60));
+    } finally {
+      setSendingCode(false);
     }
   }
 
@@ -484,6 +527,24 @@ function AuthPage({
             注册
           </button>
         </div>
+        {mode === "login" && (
+          <div className="auth-method-switch" role="tablist" aria-label="登录方式">
+            <button
+              type="button"
+              className={loginMethod === "password" ? "active" : ""}
+              onClick={() => setLoginMethod("password")}
+            >
+              密码登录
+            </button>
+            <button
+              type="button"
+              className={loginMethod === "sms" ? "active" : ""}
+              onClick={() => setLoginMethod("sms")}
+            >
+              验证码登录
+            </button>
+          </div>
+        )}
         {mode === "register" ? (
           <>
             <label>
@@ -501,10 +562,36 @@ function AuthPage({
             <input name="identifier" placeholder="study_user" required />
           </label>
         )}
-        <label>
-          密码
-          <input name="password" type="password" minLength={8} maxLength={128} placeholder="至少 8 位" required />
-        </label>
+        {mode === "login" && loginMethod === "sms" ? (
+          <>
+            <label>
+              手机号
+              <input
+                name="phone"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                inputMode="tel"
+                maxLength={11}
+                placeholder="13800138000"
+                required
+              />
+            </label>
+            <label>
+              验证码
+              <span className="code-field">
+                <input name="code" inputMode="numeric" minLength={4} maxLength={8} placeholder="6 位验证码" required />
+                <button type="button" onClick={sendCode} disabled={sendingCode || countdown > 0 || phone.trim().length < 11}>
+                  {countdown > 0 ? `${countdown}s` : sendingCode ? "发送中" : "获取验证码"}
+                </button>
+              </span>
+            </label>
+          </>
+        ) : (
+          <label>
+            密码
+            <input name="password" type="password" minLength={8} maxLength={128} placeholder="至少 8 位" required />
+          </label>
+        )}
         {message && <p className="form-message">{message}</p>}
         <button className="primary-btn" type="submit" disabled={submitting}>
           {submitting ? "正在处理..." : mode === "login" ? "进入学习记录" : "创建账户"}
