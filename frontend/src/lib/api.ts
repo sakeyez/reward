@@ -21,8 +21,6 @@ import type {
   Reward,
   RedemptionStatus,
   RewardStatus,
-  SmsCodeResponse,
-  SmsLoginRequest,
   TokenResponse,
   User,
   UserStatus
@@ -104,18 +102,6 @@ export const api = {
   },
   login(payload: LoginRequest) {
     return request<TokenResponse>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-  },
-  sendSmsCode(phone: string) {
-    return request<SmsCodeResponse>("/api/auth/sms/send-code", {
-      method: "POST",
-      body: JSON.stringify({ phone })
-    });
-  },
-  smsLogin(payload: SmsLoginRequest) {
-    return request<TokenResponse>("/api/auth/sms/login", {
       method: "POST",
       body: JSON.stringify(payload)
     });

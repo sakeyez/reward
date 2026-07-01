@@ -60,24 +60,6 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_sms_login_auto_registers_user(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("backend.app.services.sms_auth_service.secrets.randbelow", lambda _: 123456)
-
-    send_code = client.post("/api/auth/sms/send-code", json={"phone": "13800138000"})
-    assert send_code.status_code == 200
-    assert send_code.json()["expires_in_seconds"] == 300
-
-    login = client.post("/api/auth/sms/login", json={"phone": "13800138000", "code": "123456"})
-    assert login.status_code == 200
-    body = login.json()
-    assert body["access_token"]
-    assert body["user"]["phone"] == "13800138000"
-    assert body["user"]["display_name"] == "手机用户8000"
-
-    reused = client.post("/api/auth/sms/login", json={"phone": "13800138000", "code": "123456"})
-    assert reused.status_code == 401
-
-
 def test_user_checkin_points_and_redemption_flow(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_score_with_ai(checkin, config):
         return AiScoreResult(

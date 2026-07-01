@@ -36,16 +36,6 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface SmsCodeResponse {
-  message: string;
-  expires_in_seconds: number;
-}
-
-export interface SmsLoginRequest {
-  phone: string;
-  code: string;
-}
-
 export interface RegisterRequest {
   username?: string;
   phone?: string;
