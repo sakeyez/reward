@@ -4,7 +4,7 @@ This project can be deployed as a static React site served by Nginx with a local
 
 ## One-command deploy
 
-On a fresh Ubuntu/Debian Alibaba Cloud server:
+On a fresh Alibaba Cloud Linux, Ubuntu, or Debian server:
 
 ```bash
 sudo apt update && sudo apt install -y git

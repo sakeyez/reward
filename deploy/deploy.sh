@@ -12,8 +12,15 @@ if [ "$(id -u)" -eq 0 ]; then
   exit 1
 fi
 
-sudo apt update
-sudo apt install -y git nginx python3 python3-venv python3-pip nodejs npm
+if command -v apt >/dev/null 2>&1; then
+  sudo apt update
+  sudo apt install -y git nginx python3 python3-venv python3-pip nodejs npm
+elif command -v dnf >/dev/null 2>&1; then
+  sudo dnf install -y git nginx python3 python3-pip nodejs npm
+else
+  echo "Unsupported Linux distribution: apt or dnf is required."
+  exit 1
+fi
 
 if [ -d "$APP_DIR/.git" ]; then
   git -C "$APP_DIR" pull --ff-only
@@ -63,10 +70,15 @@ sudo systemctl restart "$SERVICE_NAME"
 
 TMP_NGINX="$(mktemp)"
 sed "s/server_name _;/server_name $SERVER_NAME;/" deploy/nginx.reward.conf > "$TMP_NGINX"
-sudo cp "$TMP_NGINX" "/etc/nginx/sites-available/$NGINX_SITE"
+if [ -d /etc/nginx/sites-available ]; then
+  sudo cp "$TMP_NGINX" "/etc/nginx/sites-available/$NGINX_SITE"
+  sudo ln -sfn "/etc/nginx/sites-available/$NGINX_SITE" "/etc/nginx/sites-enabled/$NGINX_SITE"
+else
+  sudo cp "$TMP_NGINX" "/etc/nginx/conf.d/$NGINX_SITE.conf"
+fi
 rm "$TMP_NGINX"
-sudo ln -sfn "/etc/nginx/sites-available/$NGINX_SITE" "/etc/nginx/sites-enabled/$NGINX_SITE"
 sudo nginx -t
+sudo systemctl enable nginx
 sudo systemctl reload nginx
 
 echo "Deployment finished."
