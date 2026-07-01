@@ -488,11 +488,11 @@ function AuthPage({
           <>
             <label>
               昵称
-              <input name="display_name" minLength={1} maxLength={80} required />
+              <input name="display_name" minLength={1} maxLength={80} placeholder="用户界面名称，后续可以修改" required />
             </label>
             <label>
               用户名
-              <input name="username" minLength={3} maxLength={64} required />
+              <input name="username" minLength={3} maxLength={64} placeholder="请用纯英文，不可修改" required />
             </label>
           </>
         ) : (
@@ -503,7 +503,7 @@ function AuthPage({
         )}
         <label>
           密码
-          <input name="password" type="password" minLength={8} maxLength={128} required />
+          <input name="password" type="password" minLength={8} maxLength={128} placeholder={mode === "register" ? "密码至少设置8位" : ""} required />
         </label>
         {message && <p className="form-message">{message}</p>}
         <button className="primary-btn" type="submit" disabled={submitting}>
