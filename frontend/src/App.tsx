@@ -11,10 +11,7 @@ import {
   Home,
   Image,
   LogOut,
-  Menu,
-  Mic,
-  PawPrint,
-  Pencil,
+  MoreVertical,
   Plus,
   Send,
   Settings,
@@ -39,11 +36,7 @@ import type {
 
 const TOKEN_KEY = "reward_access_token";
 const THEME_KEY = "reward_theme";
-const SAVINGS_GOAL_KEY = "reward_savings_goal";
-const DEFAULT_SAVINGS_GOAL = {
-  name: "买一条裙子",
-  target: 5000
-};
+const SAVINGS_GOAL_KEY = "reward_savings_goal_v2";
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -60,6 +53,7 @@ const artByCategory: Record<string, string> = {
 interface SavingsGoal {
   name: string;
   target: number;
+  imageUrl: string;
 }
 
 function App() {
@@ -75,7 +69,7 @@ function App() {
   const [selectedDay, setSelectedDay] = useState(today.getDate());
   const [activeCategory, setActiveCategory] = useState("全部");
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
-  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal>(() => readSavingsGoal());
+  const [savingsGoal, setSavingsGoal] = useState<SavingsGoal | null>(() => readSavingsGoal());
   const [loading, setLoading] = useState(Boolean(token));
   const [message, setMessage] = useState("");
   const [theme, setTheme] = useState<"paper" | "focus">(() => {
@@ -179,7 +173,11 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem(SAVINGS_GOAL_KEY, JSON.stringify(savingsGoal));
+    if (savingsGoal) {
+      localStorage.setItem(SAVINGS_GOAL_KEY, JSON.stringify(savingsGoal));
+      return;
+    }
+    localStorage.removeItem(SAVINGS_GOAL_KEY);
   }, [savingsGoal]);
 
   async function handleAuth(mode: "login" | "register", form: FormData) {
@@ -218,7 +216,7 @@ function App() {
       if (imageFile) form.set("image", imageFile);
       const created = await api.createCheckin(token, form);
       setLatestCheckin(created);
-      setRoute("result");
+      setRoute("checkin");
       await refreshDashboard(token);
     } catch (error) {
       setMessage(readableError(error));
@@ -515,83 +513,195 @@ function CheckinPage({
   setRoute: (route: RouteName) => void;
   message: string;
 }) {
-  const [contentText, setContentText] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState("");
+  const completedToday = latestCheckin?.checkin_date === todayIso;
+  const [studyHours, setStudyHours] = useState(2);
+  const [questionCount, setQuestionCount] = useState("");
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [noteImageFile, setNoteImageFile] = useState<File | null>(null);
+  const [exerciseImageFile, setExerciseImageFile] = useState<File | null>(null);
+  const [notePreview, setNotePreview] = useState("");
+  const [exercisePreview, setExercisePreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  function chooseFile(file: File | undefined) {
+  function chooseFile(file: File | undefined, kind: "note" | "exercise") {
     if (!file) return;
-    setImageFile(file);
-    setPreview(URL.createObjectURL(file));
+    const nextPreview = URL.createObjectURL(file);
+    if (kind === "note") {
+      setNoteImageFile(file);
+      setNotePreview(nextPreview);
+      return;
+    }
+    setExerciseImageFile(file);
+    setExercisePreview(nextPreview);
   }
 
   async function submit() {
-    if (!contentText.trim() && !imageFile) {
+    const content = [
+      `学习时长：${studyHours} 小时`,
+      questionCount.trim() ? `做题总数：${questionCount.trim()}` : "",
+      aiEnabled ? "AI 判题：开启" : "AI 判题：关闭"
+    ].filter(Boolean).join("\n");
+    const imageFile = exerciseImageFile ?? noteImageFile;
+    if (!content.trim() && !imageFile) {
       return;
     }
     setSubmitting(true);
     try {
-      await onSubmit(contentText, imageFile);
-      setContentText("");
-      setImageFile(null);
-      setPreview("");
+      await onSubmit(content, imageFile);
+      setQuestionCount("");
+      setNoteImageFile(null);
+      setExerciseImageFile(null);
+      setNotePreview("");
+      setExercisePreview("");
     } finally {
       setSubmitting(false);
     }
   }
 
+  if (completedToday && latestCheckin) {
+    if (latestCheckin.status === "analyzing" || latestCheckin.total_score == null) {
+      return <AnalyzingCheckinPage setRoute={setRoute} />;
+    }
+
+    return (
+      <section className="learning-record-page learning-result-page">
+        <LearningTopBar title="今日总结" onBack={() => setRoute("home")} />
+        <ScoreCard checkin={latestCheckin} />
+      </section>
+    );
+  }
+
+  if (submitting) {
+    return <AnalyzingCheckinPage setRoute={setRoute} />;
+  }
+
   return (
-    <section className="page chat-page with-input">
-      <header className="chat-top">
-        <button className="round-tool" onClick={() => setRoute("home")} aria-label="返回首页"><Menu /></button>
-        <button className="model-title" type="button">学习记录</button>
-        <label className="round-tool accent" aria-label="添加学习成果">
-          <Pencil />
-          <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0])} />
-        </label>
-      </header>
-      <div className="chat-list">
-        {!preview && !latestCheckin && (
-          <div className="bubble-row">
-            <div className="assistant-prose">发来今天的笔记、错题或一句复盘，我来给你评分。</div>
+    <section className="learning-record-page">
+      <LearningTopBar title="学习记录" onBack={() => setRoute("home")} />
+      <article className="learning-card time-card">
+        <div className="learning-section-title">
+          <span className="learning-section-icon"><ClockGlyph /></span>
+          <h2>学习时长</h2>
+        </div>
+        <div className="time-slider-wrap">
+          <input
+            className="time-slider"
+            type="range"
+            min={0}
+            max={4}
+            step={1}
+            value={studyHours}
+            onChange={(event) => setStudyHours(Number(event.target.value))}
+            aria-label="学习时长"
+          />
+          <div className="time-labels" aria-hidden="true">
+            <span>0h</span>
+            <span>1h</span>
+            <span>2h</span>
+            <span>3h</span>
+            <span>4h+</span>
           </div>
-        )}
-        {preview && (
-          <div className="bubble-row user">
-            <div className="chat-bubble">
-              <div className="upload-preview"><img src={preview} alt="上传的学习成果缩略图" /></div>
-              <p style={{ margin: "8px 0 0" }}>这是今天的小成果，请帮我看看。</p>
-            </div>
+        </div>
+      </article>
+
+      <article className="learning-card">
+        <div className="learning-section-title">
+          <span className="learning-section-icon"><NoteGlyph /></span>
+          <h2>学习笔记</h2>
+        </div>
+        <label className={`learning-upload ${notePreview ? "has-preview" : ""}`}>
+          {notePreview ? (
+            <img src={notePreview} alt="学习笔记预览" />
+          ) : (
+            <>
+              <CameraPlusGlyph />
+              <span>添加学习图片</span>
+            </>
+          )}
+          <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0], "note")} />
+        </label>
+      </article>
+
+      <article className="learning-card">
+        <div className="learning-section-title">
+          <span className="learning-section-icon"><QuestionGlyph /></span>
+          <h2>做题记录</h2>
+        </div>
+        <div className="ai-toggle-row">
+          <span>AI 判题</span>
+          <button
+            className={`ai-switch ${aiEnabled ? "active" : ""}`}
+            onClick={() => setAiEnabled((value) => !value)}
+            type="button"
+            role="switch"
+            aria-checked={aiEnabled}
+            aria-label="AI 判题"
+          />
+        </div>
+        <label className="question-field">
+          做题总数
+          <input
+            value={questionCount}
+            onChange={(event) => setQuestionCount(event.target.value)}
+            inputMode="numeric"
+            placeholder="输入题目数量"
+          />
+        </label>
+        <div className="ai-status-panel">
+          <span>AI</span>
+          <div>
+            <strong>智能判题已开启</strong>
+            <p>提交后将自动为您计算正确率及解析</p>
           </div>
-        )}
-        {latestCheckin && <div className="bubble-row"><div className="score-wrap"><ScoreCard checkin={latestCheckin} /></div></div>}
-        {message && <p className="form-message">{message}</p>}
-      </div>
-      <div className="input-bar">
-        <label className="composer-plus" aria-label="添加图片">
-          <Plus />
-          <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseFile(event.target.files?.[0])} />
+        </div>
+        <label className={`learning-upload exercise-upload ${exercisePreview ? "has-preview" : ""}`}>
+          {exercisePreview ? (
+            <img src={exercisePreview} alt="题目照片预览" />
+          ) : (
+            <>
+              <CameraPlusGlyph />
+              <span>上传题目照片</span>
+            </>
+          )}
+          <input className="file-input" type="file" accept="image/*" capture="environment" onChange={(event) => chooseFile(event.target.files?.[0], "exercise")} />
         </label>
-        <input
-          type="text"
-          value={contentText}
-          onChange={(event) => setContentText(event.target.value)}
-          placeholder="记录今天的学习"
-          aria-label="输入学习说明"
-        />
-        <label className="composer-mic" aria-label="拍照上传">
-          <Camera />
-          <input className="file-input" type="file" accept="image/*" capture="environment" onChange={(event) => chooseFile(event.target.files?.[0])} />
-        </label>
-        <button
-          className="composer-send"
-          onClick={submit}
-          disabled={submitting || (!contentText.trim() && !imageFile)}
-          aria-label="发送"
-        >
-          {submitting ? <Mic /> : <Send />}
+      </article>
+
+      {message && <p className="form-message">{message}</p>}
+      <div className="learning-submit-wrap">
+        <button className="primary-btn" onClick={submit} disabled={submitting || (!questionCount.trim() && !noteImageFile && !exerciseImageFile)}>
+          {submitting ? "正在提交..." : "提交学习记录"}
         </button>
+      </div>
+    </section>
+  );
+}
+
+function LearningTopBar({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <header className="learning-topbar">
+      <button className="learning-icon-btn" onClick={onBack} aria-label="返回首页"><ChevronLeft /></button>
+      <h1>{title}</h1>
+      <button className="learning-icon-btn" type="button" aria-label="更多"><MoreVertical /></button>
+    </header>
+  );
+}
+
+function AnalyzingCheckinPage({ setRoute }: { setRoute: (route: RouteName) => void }) {
+  return (
+    <section className="learning-record-page analyzing-page">
+      <LearningTopBar title="评分中" onBack={() => setRoute("home")} />
+      <div className="analyzing-stage" role="status">
+        <div className="analysis-orbit" aria-hidden="true">
+          <span className="orbit orbit-outer" />
+          <span className="orbit orbit-middle" />
+          <span className="orbit orbit-dashed" />
+          <span className="analysis-mascot">
+            <img src={dogecoinIcon} alt="" />
+          </span>
+        </div>
+        <h2>正在分析您的学习记录...</h2>
+        <p>这通常需要几秒钟。</p>
       </div>
     </section>
   );
@@ -718,90 +828,133 @@ function SavingsGoalPage({
   setRoute
 }: {
   user: UserType;
-  goal: SavingsGoal;
-  setGoal: (goal: SavingsGoal) => void;
+  goal: SavingsGoal | null;
+  setGoal: (goal: SavingsGoal | null) => void;
   setRoute: (route: RouteName) => void;
 }) {
-  const [draftName, setDraftName] = useState(goal.name);
-  const [draftTarget, setDraftTarget] = useState(String(goal.target));
-  const progress = Math.min(user.current_points / goal.target, 1);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draftName, setDraftName] = useState(goal?.name ?? "");
+  const [draftTarget, setDraftTarget] = useState(goal ? String(goal.target) : "");
+  const [draftImage, setDraftImage] = useState(goal?.imageUrl ?? "");
+  const progress = goal ? Math.min(user.current_points / goal.target, 1) : 0;
   const percent = Math.round(progress * 100);
-  const fillHeight = Math.round(progress * 54);
-  const remaining = Math.max(goal.target - user.current_points, 0);
-  const achieved = remaining === 0;
+  const remaining = goal ? Math.max(goal.target - user.current_points, 0) : 0;
+  const achieved = Boolean(goal && remaining === 0);
+
+  function openEditor() {
+    setDraftName(goal?.name ?? "");
+    setDraftTarget(goal ? String(goal.target) : "");
+    setDraftImage(goal?.imageUrl ?? "");
+    setEditorOpen(true);
+  }
+
+  function chooseGoalImage(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setDraftImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
 
   function saveGoal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextTarget = Math.max(1, Math.round(Number(draftTarget) || DEFAULT_SAVINGS_GOAL.target));
+    const nextName = draftName.trim();
+    const nextTarget = Math.max(1, Math.round(Number(draftTarget) || 0));
+    if (!nextName || !nextTarget) return;
     setGoal({
-      name: draftName.trim() || DEFAULT_SAVINGS_GOAL.name,
-      target: nextTarget
+      name: nextName,
+      target: nextTarget,
+      imageUrl: draftImage
     });
+    setEditorOpen(false);
   }
 
   return (
     <section className="page savings-page">
-      <header className="savings-top">
+      <div className="title-row">
         <div>
-          <p className="eyebrow">目标存钱罐</p>
-          <h1>把狗狗币攒成想要的东西</h1>
+          <p className="eyebrow">奖励中心</p>
+          <h1>目标商城</h1>
         </div>
-        <span className="paw-badge" aria-hidden="true"><PawPrint /></span>
-      </header>
-      <article className={`piggy-card ${achieved ? "complete" : ""}`} aria-label={`${goal.name} 目标进度 ${percent}%`}>
-        <div className="piggy-bank" style={{ "--progress": `${percent}%`, "--fill-height": `${fillHeight}%` } as React.CSSProperties}>
-          <div className="coin-slot" />
-          <div className="coin-rain">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="piggy-fill" />
-          <div className="piggy-face">
-            <span />
-            <span />
-          </div>
-        </div>
-        <div className="piggy-copy">
-          <p className="eyebrow">{achieved ? "目标达成" : "正在存"}</p>
-          <h2>{goal.name}</h2>
-          <div className="goal-progress-row">
-            <strong>{percent}%</strong>
-            <span>{achieved ? "已经存满啦" : `还差 ${remaining} 狗狗币`}</span>
-          </div>
-          <div className="progress-track savings-track">
-            <div className="progress-fill" style={{ width: `${percent}%` }} />
-          </div>
-          <div className="goal-total">
-            <DogecoinAmount value={user.current_points} />
-            <span>/</span>
-            <DogecoinAmount value={goal.target} />
-          </div>
-        </div>
-      </article>
-      <form className="goal-form" onSubmit={saveGoal}>
-        <label>
-          想买什么
-          <input value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={30} />
-        </label>
-        <label>
-          需要多少狗狗币
-          <input
-            value={draftTarget}
-            onChange={(event) => setDraftTarget(event.target.value)}
-            inputMode="numeric"
-            pattern="[0-9]*"
-          />
-        </label>
-        <button className="primary-btn" type="submit">保存目标</button>
-      </form>
-      <div className="shop-dock" aria-label="狗狗币和商城入口">
-        <span className="dock-balance"><DogecoinAmount value={user.current_points} /></span>
-        <button className="dock-shop-link" onClick={() => setRoute("shop")}>
-          <span>商城</span>
-          <ChevronRight />
-        </button>
+        <span className="pill savings-balance-pill"><DogecoinAmount value={user.current_points} hideLabel /></span>
       </div>
+      {goal ? (
+        <article className={`goal-card ${achieved ? "complete" : ""}`} aria-label={`${goal.name} 目标进度 ${percent}%`}>
+          <div className={`goal-image ${goal.imageUrl ? "has-image" : ""}`}>
+            {goal.imageUrl ? (
+              <img src={goal.imageUrl} alt={goal.name} />
+            ) : (
+              <button type="button" onClick={openEditor} aria-label="添加目标图片">
+                <Image />
+              </button>
+            )}
+          </div>
+          <div className="goal-card-copy">
+            <div className="sheet-row">
+              <p className="eyebrow">{achieved ? "目标达成" : "正在存"}</p>
+              <button className="goal-edit-btn" onClick={openEditor}>编辑</button>
+            </div>
+            <h2>{goal.name}</h2>
+            <div className="goal-progress-row">
+              <strong>{percent}%</strong>
+              <span>{achieved ? "已经存满啦" : `还差 ${remaining} 狗狗币`}</span>
+            </div>
+            <div className="progress-track savings-track">
+              <div className="progress-fill" style={{ width: `${percent}%` }} />
+            </div>
+            <div className="goal-total">
+              <DogecoinAmount value={user.current_points} hideLabel />
+              <span>/</span>
+              <span className="goal-target-value">{goal.target}</span>
+            </div>
+          </div>
+        </article>
+      ) : (
+        <button className="empty-goal" onClick={openEditor}>
+          <span><Plus /></span>
+          <strong>设置一个目标</strong>
+        </button>
+      )}
+      <button className="shop-entry-card" onClick={() => setRoute("shop")}>
+        <span className="shop-entry-icon"><PawIcon /></span>
+        <span>
+          <strong>狗狗币商城</strong>
+          <small>查看可以兑换的奖励</small>
+        </span>
+        <ChevronRight />
+      </button>
+      {editorOpen && (
+        <div className="modal-scrim" onClick={() => setEditorOpen(false)} role="presentation">
+          <form className="goal-form goal-sheet" onSubmit={saveGoal} role="dialog" aria-modal="true" aria-label="设置目标" onClick={(event) => event.stopPropagation()}>
+            <div className="sheet-row">
+              <h2 style={{ margin: 0 }}>设置目标</h2>
+              <button className="sheet-close" type="button" onClick={() => setEditorOpen(false)} aria-label="关闭"><X /></button>
+            </div>
+            <label className="goal-image-picker">
+              <span className={draftImage ? "has-preview" : ""}>
+                {draftImage ? <img src={draftImage} alt="" /> : <Image />}
+              </span>
+              上传目标图片
+              <input className="file-input" type="file" accept="image/*" onChange={(event) => chooseGoalImage(event.target.files?.[0])} />
+            </label>
+            <label>
+              想买什么
+              <input value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={30} autoFocus />
+            </label>
+            <label>
+              需要多少狗狗币
+              <input
+                value={draftTarget}
+                onChange={(event) => setDraftTarget(event.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+            </label>
+            <button className="primary-btn" type="submit" disabled={!draftName.trim() || !Number(draftTarget)}>保存目标</button>
+          </form>
+        </div>
+      )}
     </section>
   );
 }
@@ -868,7 +1021,7 @@ function ShopPage({
             <h3>{reward.name}</h3>
             <p className="reward-description">{reward.description}</p>
             <div className="product-meta">
-              <span className="points"><DogecoinAmount value={reward.cost_points} /></span>
+              <span className="points"><DogecoinAmount value={reward.cost_points} hideLabel /></span>
             </div>
             <span className={`stock ${reward.can_redeem ? "" : "locked"}`}>
               {reward.can_redeem ? "可兑换" : `还差 ${reward.points_shortfall}`}
@@ -1132,7 +1285,7 @@ function BottomNav({ route, setRoute }: { route: RouteName; setRoute: (route: Ro
     ["home", "首页", <Home />],
     ["calendar", "日历", <Calendar />],
     ["checkin", "打卡", <Plus />],
-    ["shopGoal", "商城", <PawPrint />],
+    ["shopGoal", "商城", <PawIcon />],
     ["profile", "我的", <User />]
   ];
   const activeRoute = route === "badges" ? "profile" : route === "shop" ? "shopGoal" : route;
@@ -1190,37 +1343,76 @@ function RedeemModal({
 }
 
 function ScoreCard({ checkin }: { checkin: Checkin }) {
+  const score = checkin.total_score ?? 0;
+  const scoreDelta = Math.max(1, Math.round((checkin.awarded_points || score) / 2));
+  const rewardPoints = calculateDisplayReward(checkin);
+  const scoreGrade = score >= 90 ? "A+" : score >= 80 ? "A" : score >= 70 ? "B" : score > 0 ? "C" : "--";
+  const streakDays = readStreakFromComment(checkin.ai_advice) ?? 7;
+
   return (
-    <article className="score-card">
-      <div className="score-head">
+    <div className="score-report">
+      <article className="score-summary-card">
         <div>
-          <p className="eyebrow">今日综合评分</p>
+          <p className="summary-label">今日综合评分</p>
           <div className="score-number">
             <strong>{checkin.total_score ?? "--"}</strong>
-            <span>+{checkin.awarded_points}</span>
+            <span>↗ +{scoreDelta} 较昨日</span>
           </div>
         </div>
-        <EnergyRing value={checkin.total_score ?? 0} label="评分" compact />
-      </div>
-      <Dimensions dimensions={checkin.score_dimensions} />
-      <p className="ai-note"><strong>AI 评价：</strong>{checkin.ai_comment}</p>
-      <p className="ai-note"><strong>明日建议：</strong>{checkin.ai_advice}</p>
-    </article>
+        <GradeRing value={score} grade={scoreGrade} />
+      </article>
+
+      <article className="reward-banner">
+        <img src={dogecoinIcon} alt="" />
+        <div>
+          <strong>恭喜！您已获得奖励</strong>
+          <p><span>+{rewardPoints}</span> Dogecoins</p>
+        </div>
+      </article>
+
+      <article className="score-detail-card">
+        <Dimensions dimensions={checkin.score_dimensions} />
+        <div className="streak-line">已连续学习 {streakDays} 天</div>
+      </article>
+
+      <article className="ai-review-card">
+        <div className="review-title"><PawIcon /> 小狗评价</div>
+        <p>{checkin.ai_comment ?? "今天的学习记录已经完成，继续保持稳定复盘。"}</p>
+        {checkin.ai_advice && <p className="review-advice">{checkin.ai_advice}</p>}
+      </article>
+    </div>
   );
 }
 
 function Dimensions({ dimensions }: { dimensions: Checkin["score_dimensions"] }) {
+  const fallbackDimensions: Checkin["score_dimensions"] = [
+    { id: -1, dimension_code: "workload", dimension_name: "工作量", score: 84, sort_order: 1 },
+    { id: -2, dimension_code: "completion", dimension_name: "工整度", score: 81, sort_order: 2 },
+    { id: -3, dimension_code: "accuracy", dimension_name: "正确率", score: 76, sort_order: 3 },
+    { id: -4, dimension_code: "notes", dimension_name: "笔记质量", score: 82, sort_order: 4 }
+  ];
+  const source = dimensions.length ? dimensions : fallbackDimensions;
+  const displayNames = ["工作量", "工整度", "准确率", "笔记质量"];
+
   return (
     <div className="dimension-list">
-      {[...dimensions].sort((a, b) => a.sort_order - b.sort_order).map((dimension) => (
+      {[...source].sort((a, b) => a.sort_order - b.sort_order).slice(0, 4).map((dimension, index) => (
         <div key={dimension.id}>
           <div className="dim-head">
-            <span>{dimension.dimension_name}</span>
-            <span>{dimension.score} 分</span>
+            <span>{displayNames[index] ?? dimension.dimension_name}</span>
+            <span>{dimension.score}</span>
           </div>
           <div className="dim-track"><div className="dim-fill" style={{ width: `${dimension.score}%` }} /></div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function GradeRing({ value, grade }: { value: number; grade: string }) {
+  return (
+    <div className="grade-ring" style={{ "--value": value } as React.CSSProperties}>
+      <span>{grade}</span>
     </div>
   );
 }
@@ -1254,13 +1446,78 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <article className="metric-card"><span>{label}</span><strong>{value}</strong></article>;
 }
 
-function DogecoinAmount({ value, compact = false }: { value: string | number; compact?: boolean }) {
+function DogecoinAmount({
+  value,
+  compact = false,
+  hideLabel = false
+}: {
+  value: string | number;
+  compact?: boolean;
+  hideLabel?: boolean;
+}) {
   return (
     <span className={`dogecoin-amount ${compact ? "compact-coin" : ""}`}>
       <img src={dogecoinIcon} alt="" />
       <span>{value}</span>
-      <small>狗狗币</small>
+      {!hideLabel && <small>狗狗币</small>}
     </span>
+  );
+}
+
+function PawIcon() {
+  return (
+    <svg className="paw-icon" viewBox="-4 -3 72 70" aria-hidden="true" focusable="false">
+      <ellipse cx="11.8" cy="26.2" rx="7.3" ry="10.6" transform="rotate(-29 11.8 26.2)" />
+      <ellipse cx="24.6" cy="13.8" rx="7.3" ry="10.6" transform="rotate(-10 24.6 13.8)" />
+      <ellipse cx="43.4" cy="13.8" rx="7.3" ry="10.6" transform="rotate(10 43.4 13.8)" />
+      <ellipse cx="56.2" cy="26.2" rx="7.3" ry="10.6" transform="rotate(29 56.2 26.2)" />
+      <path d="M34 31c-10.6 0-20 10.8-20 21.4 0 5.9 3.8 8.8 9.1 7.1 3.7-1.2 6.1-2 10.9-2s7.2.8 10.9 2c5.3 1.7 9.1-1.2 9.1-7.1C54 41.8 44.6 31 34 31Z" />
+    </svg>
+  );
+}
+
+function ClockGlyph() {
+  return (
+    <svg viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <path d="M5 7.5h10.5" />
+      <path d="M5 14h7" />
+      <path d="M5 20.5h4.5" />
+      <path d="M17 18.5l3.2-3.2 2.3 2.3" />
+      <path d="M20.2 15.3v5.4" />
+    </svg>
+  );
+}
+
+function NoteGlyph() {
+  return (
+    <svg viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <path d="M5 7.5h10" />
+      <path d="M5 14h7.5" />
+      <path d="M5 20.5h5" />
+      <path d="M16 20.5l5.8-5.8 2.2 2.2-5.8 5.8-3 .8.8-3Z" />
+    </svg>
+  );
+}
+
+function QuestionGlyph() {
+  return (
+    <svg viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <path d="M5.5 6.5h17v15h-17z" />
+      <path d="M10.5 11.2a3.4 3.4 0 0 1 6.6 1.1c0 2.6-3.1 2.7-3.1 5" />
+      <path d="M14 19.7v.1" />
+      <path d="M3.5 9.5v14h16" />
+    </svg>
+  );
+}
+
+function CameraPlusGlyph() {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path d="M8 10h3.4l1.8-2.2h5.6l1.8 2.2H24a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V13a3 3 0 0 1 3-3Z" />
+      <circle cx="16" cy="18" r="4.5" />
+      <path d="M25 5v6" />
+      <path d="M22 8h6" />
+    </svg>
   );
 }
 
@@ -1297,18 +1554,20 @@ function readableError(error: unknown): string {
   return "请求失败，请稍后再试";
 }
 
-function readSavingsGoal(): SavingsGoal {
-  const fallback = { ...DEFAULT_SAVINGS_GOAL };
+function readSavingsGoal(): SavingsGoal | null {
   try {
     const raw = localStorage.getItem(SAVINGS_GOAL_KEY);
-    if (!raw) return fallback;
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<SavingsGoal>;
+    if (typeof parsed.name !== "string" || !parsed.name.trim()) return null;
+    if (typeof parsed.target !== "number" || parsed.target <= 0) return null;
     return {
-      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : fallback.name,
-      target: typeof parsed.target === "number" && parsed.target > 0 ? parsed.target : fallback.target
+      name: parsed.name,
+      target: parsed.target,
+      imageUrl: typeof parsed.imageUrl === "string" ? parsed.imageUrl : ""
     };
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -1338,6 +1597,19 @@ function average(values: number[]): number {
   const filtered = values.filter((value) => value > 0);
   if (!filtered.length) return 0;
   return filtered.reduce((sum, value) => sum + value, 0) / filtered.length;
+}
+
+function readStreakFromComment(value: string | null): number | null {
+  if (!value) return null;
+  const match = value.match(/连续(?:学习|打卡)?\s*(\d+)\s*天/);
+  return match ? Number(match[1]) : null;
+}
+
+function calculateDisplayReward(checkin: Checkin): number {
+  if (checkin.awarded_points > 0 && checkin.awarded_points !== checkin.total_score) {
+    return checkin.awarded_points;
+  }
+  return 10;
 }
 
 function levelName(points: number): string {
