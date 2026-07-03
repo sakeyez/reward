@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.api.deps import get_current_user
+from backend.app.core.business_date import current_business_date
 from backend.app.db.session import get_db_session
 from backend.app.models.user import User
 from backend.app.schemas.checkin import CheckinCalendarItem, CheckinCalendarResponse, CheckinRead
@@ -40,7 +41,7 @@ async def submit_checkin(
         image=image,
         note_images=note_image or [],
         exercise_images=exercise_image or [],
-        checkin_date=checkin_date or date.today(),
+        checkin_date=checkin_date or current_business_date(),
         study_time_minutes=study_time_minutes,
         question_count=question_count,
     )

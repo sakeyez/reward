@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -196,6 +197,32 @@ def test_user_can_update_profile(client: TestClient) -> None:
     body = update.json()
     assert body["display_name"] == "After"
     assert body["avatar_url"].startswith("/uploads/avatars/")
+
+
+def test_checkin_without_date_uses_business_date(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("backend.app.api.routes.checkins.current_business_date", lambda: date(2026, 7, 1))
+    register = client.post(
+        "/api/auth/register",
+        json={
+            "username": "business_date_user",
+            "password": "password123",
+            "display_name": "Business Date",
+        },
+    )
+    assert register.status_code == 201
+    token = register.json()["access_token"]
+
+    checkin = client.post(
+        "/api/checkins",
+        data={"content_text": "凌晨继续学习，仍然算前一天。"},
+        headers=auth_headers(token),
+    )
+
+    assert checkin.status_code == 201
+    assert checkin.json()["checkin_date"] == "2026-07-01"
 
 
 def test_user_can_submit_multiple_note_and_exercise_images(client: TestClient) -> None:

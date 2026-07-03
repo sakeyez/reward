@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.app.api.deps import get_current_admin_user
+from backend.app.core.business_date import current_business_date
 from backend.app.db.session import get_db_session
 from backend.app.models.checkin import Checkin, CheckinStatus
 from backend.app.models.point import PointTransaction, PointTransactionType
@@ -59,7 +60,7 @@ async def read_admin_summary(
     _admin: Annotated[User, Depends(get_current_admin_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AdminSummary:
-    today = date.today()
+    today = current_business_date()
     users_total = await scalar_count(session, select(func.count()).select_from(User))
     active_users = await scalar_count(
         session,

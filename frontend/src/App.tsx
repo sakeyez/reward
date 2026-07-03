@@ -40,6 +40,7 @@ import type {
 const TOKEN_KEY = "reward_access_token";
 const THEME_KEY = "reward_theme";
 const SAVINGS_GOAL_KEY = "reward_savings_goal_v2";
+const BUSINESS_DAY_START_HOUR = 4;
 
 const artByCategory: Record<string, string> = {
   "文具": "stationery",
@@ -81,14 +82,14 @@ function App() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [user, setUser] = useState<UserType | null>(null);
   const [route, setRoute] = useState<RouteName>("home");
-  const [today, setToday] = useState(() => new Date());
+  const [today, setToday] = useState(() => getBusinessDate());
   const [checkins, setCheckins] = useState<Checkin[]>([]);
   const [latestCheckin, setLatestCheckin] = useState<Checkin | null>(null);
   const [points, setPoints] = useState<PointAccount | null>(null);
   const [calendar, setCalendar] = useState<CheckinCalendarResponse | null>(null);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [redemptions, setRedemptions] = useState<Redemption[]>([]);
-  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
+  const [selectedDay, setSelectedDay] = useState(() => getBusinessDate().getDate());
   const [activeCategory, setActiveCategory] = useState("全部");
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [savingsGoal, setSavingsGoal] = useState<SavingsGoal | null>(() => readSavingsGoal());
@@ -176,7 +177,7 @@ function App() {
 
   useEffect(() => {
     function syncToday() {
-      const nextToday = new Date();
+      const nextToday = getBusinessDate();
       setToday((currentToday) => (
         formatDateInput(currentToday) === formatDateInput(nextToday) ? currentToday : nextToday
       ));
@@ -1771,6 +1772,14 @@ function formatDateInput(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getBusinessDate(now = new Date()): Date {
+  const businessDate = new Date(now);
+  if (businessDate.getHours() < BUSINESS_DAY_START_HOUR) {
+    businessDate.setDate(businessDate.getDate() - 1);
+  }
+  return businessDate;
 }
 
 function formatReadableDate(date: Date): string {
