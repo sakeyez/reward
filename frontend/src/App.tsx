@@ -239,6 +239,32 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!token || !latestCheckin || latestCheckin.status !== "analyzing" || latestCheckin.ai_error) return;
+
+    let cancelled = false;
+    async function pollCheckin() {
+      if (!token || !latestCheckin) return;
+      try {
+        const nextCheckin = await api.readCheckin(token, latestCheckin.id);
+        if (cancelled) return;
+        setLatestCheckin(nextCheckin);
+        if (nextCheckin.status === "scored") {
+          await refreshDashboard(token);
+        }
+      } catch (error) {
+        if (!cancelled) setMessage(readableError(error));
+      }
+    }
+
+    pollCheckin();
+    const timer = window.setInterval(pollCheckin, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [latestCheckin, refreshDashboard, token]);
+
+  useEffect(() => {
     if (savingsGoal) {
       localStorage.setItem(SAVINGS_GOAL_KEY, JSON.stringify(savingsGoal));
       return;
@@ -654,7 +680,7 @@ function CheckinPage({
 
   if (completedToday && latestCheckin) {
     if (latestCheckin.status === "analyzing" || latestCheckin.total_score == null) {
-      return <AnalyzingCheckinPage setRoute={setRoute} />;
+      return <AnalyzingCheckinPage aiError={latestCheckin.ai_error} setRoute={setRoute} />;
     }
 
     return (
@@ -795,7 +821,13 @@ function LearningTopBar({ title, onBack }: { title: string; onBack: () => void }
   );
 }
 
-function AnalyzingCheckinPage({ setRoute }: { setRoute: (route: RouteName) => void }) {
+function AnalyzingCheckinPage({
+  aiError,
+  setRoute
+}: {
+  aiError?: string | null;
+  setRoute: (route: RouteName) => void;
+}) {
   return (
     <section className="learning-record-page analyzing-page">
       <LearningTopBar title="评分中" onBack={() => setRoute("home")} />
@@ -808,8 +840,8 @@ function AnalyzingCheckinPage({ setRoute }: { setRoute: (route: RouteName) => vo
             <img src={dogecoinIcon} alt="" />
           </span>
         </div>
-        <h2>正在分析您的学习记录...</h2>
-        <p>这通常需要几秒钟。</p>
+        <h2>{aiError ? "AI 分析暂时失败" : "正在分析您的学习记录..."}</h2>
+        <p>{aiError ? "请联系管理员检查 AI 配置后重试评分。" : "这通常需要几秒钟。"}</p>
       </div>
     </section>
   );

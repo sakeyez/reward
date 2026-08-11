@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backend.app.api.deps import get_current_user
 from backend.app.core.business_date import current_business_date
@@ -45,7 +45,7 @@ async def submit_checkin(
         study_time_minutes=study_time_minutes,
         question_count=question_count,
     )
-    background_tasks.add_task(analyze_checkin, session, checkin.id)
+    background_tasks.add_task(analyze_checkin_background, checkin.id, session.bind)
     return CheckinRead.model_validate(checkin)
 
 
@@ -95,3 +95,9 @@ async def read_my_checkin(
     if checkin is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found")
     return CheckinRead.model_validate(checkin)
+
+
+async def analyze_checkin_background(checkin_id: int, bind: AsyncEngine) -> None:
+    session_factory = async_sessionmaker(bind=bind, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as session:
+        await analyze_checkin(session, checkin_id)

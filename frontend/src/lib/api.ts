@@ -121,6 +121,9 @@ export const api = {
       body: formData
     }, token);
   },
+  readCheckin(token: string, checkinId: number) {
+    return request<Checkin>(`/api/checkins/${checkinId}`, {}, token);
+  },
   listCheckins(token: string, limit = 20) {
     return request<Checkin[]>(`/api/checkins/me?limit=${limit}`, {}, token);
   },
