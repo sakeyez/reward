@@ -468,7 +468,7 @@ function CheckinsPanel({
           statusTag(item.status),
           truncate(item.ai_error ? `错误：${item.ai_error}` : item.ai_comment ?? "-"),
           <div className="admin-actions">
-            {item.status === "analyzing" && <button onClick={() => onRetry(item)}>重试评分</button>}
+            {["analyzing", "rejected"].includes(item.status) && <button onClick={() => onRetry(item)}>重试评分</button>}
             <button onClick={() => onReset(item)}>重置</button>
           </div>
         ])}

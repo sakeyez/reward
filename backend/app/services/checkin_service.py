@@ -90,7 +90,7 @@ async def analyze_checkin(session: AsyncSession, checkin_id: int) -> Checkin | N
         ai_result = await score_with_ai(checkin, setting_to_runtime(setting))
     except (AiScoringError, ValueError, RuntimeError) as exc:
         checkin.ai_error = str(exc)
-        checkin.status = CheckinStatus.analyzing
+        checkin.status = CheckinStatus.rejected
         await session.commit()
         return checkin
 
